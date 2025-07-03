@@ -1,0 +1,540 @@
+<?php
+/**
+ * Clase para el panel de administración
+ */
+class FSC_Admin {
+    
+    public function __construct() {
+        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_init', array($this, 'admin_init'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
+        add_action('admin_bar_menu', array($this, 'add_admin_bar_menu'), 100);
+        
+        // AJAX handlers
+        add_action('wp_ajax_fsc_toggle_cache', array($this, 'ajax_toggle_cache'));
+        add_action('wp_ajax_fsc_generate_all_pages', array($this, 'ajax_generate_all_pages'));
+        add_action('wp_ajax_fsc_clear_cache', array($this, 'ajax_clear_cache'));
+        add_action('wp_ajax_fsc_get_stats', array($this, 'ajax_get_stats'));
+        add_action('wp_ajax_fsc_preload_cache', array($this, 'ajax_preload_cache'));
+    }
+    
+    public function add_admin_menu() {
+        add_options_page(
+            'Fast Static Cache',
+            'Fast Static Cache',
+            'manage_options',
+            'fast-static-cache',
+            array($this, 'admin_page')
+        );
+    }
+    
+    public function admin_init() {
+        register_setting('fsc_settings', 'fsc_enabled');
+        register_setting('fsc_settings', 'fsc_cache_lifetime');
+        register_setting('fsc_settings', 'fsc_excluded_pages');
+        register_setting('fsc_settings', 'fsc_excluded_user_agents');
+        register_setting('fsc_settings', 'fsc_show_cache_info');
+    }
+    
+    public function admin_page() {
+        $stats = fsc_get_cache_stats();
+        $total_pages = fsc_get_total_pages_count();
+        $enabled = get_option('fsc_enabled', true);
+        $progress_percent = $total_pages['total'] > 0 ? round(($stats['files'] / $total_pages['total']) * 100, 1) : 0;
+        ?>
+        <div class="wrap">
+            <h1>Fast Static Cache</h1>
+            
+            <!-- Control Principal Minimalista -->
+            <div class="fsc-main-card">
+                <div class="fsc-header">
+                    <div class="fsc-status">
+                        <h2>Sistema de Caché Estático</h2>
+                        <p class="fsc-status-text <?php echo $enabled ? 'active' : 'inactive'; ?>">
+                            <?php echo $enabled ? '● Activo' : '● Inactivo'; ?>
+                        </p>
+                    </div>
+                    <div class="fsc-toggle">
+                        <label class="fsc-switch">
+                            <input type="checkbox" id="fsc-toggle-cache" <?php checked($enabled); ?>>
+                            <span class="fsc-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Estadísticas Compactas -->
+                <div class="fsc-stats">
+                    <div class="fsc-stat">
+                        <span class="fsc-stat-number"><?php echo $stats['files']; ?></span>
+                        <span class="fsc-stat-label">Páginas Estáticas</span>
+                    </div>
+                    <div class="fsc-stat">
+                        <span class="fsc-stat-number"><?php echo $total_pages['total']; ?></span>
+                        <span class="fsc-stat-label">Total Páginas</span>
+                    </div>
+                    <div class="fsc-stat">
+                        <span class="fsc-stat-number"><?php echo $progress_percent; ?>%</span>
+                        <span class="fsc-stat-label">Progreso</span>
+                    </div>
+                    <div class="fsc-stat">
+                        <span class="fsc-stat-number"><?php echo $this->format_bytes($stats['size']); ?></span>
+                        <span class="fsc-stat-label">Tamaño</span>
+                    </div>
+                </div>
+                
+                <!-- Barra de Progreso -->
+                <div class="fsc-progress-container">
+                    <div class="fsc-progress-bar">
+                        <div class="fsc-progress-fill" style="width: <?php echo $progress_percent; ?>%"></div>
+                    </div>
+                    <span class="fsc-progress-text"><?php echo $stats['files']; ?> de <?php echo $total_pages['total']; ?> páginas convertidas</span>
+                </div>
+            </div>
+            
+            <!-- Acciones -->
+            <div class="fsc-actions-card">
+                <h3>Acciones</h3>
+                <div class="fsc-actions">
+                    <button type="button" id="fsc-generate-all" class="fsc-btn fsc-btn-primary">
+                        <span class="fsc-btn-icon">🚀</span>
+                        Generar TODAS las Páginas
+                    </button>
+                    <button type="button" id="fsc-preload-cache" class="fsc-btn fsc-btn-secondary">
+                        <span class="fsc-btn-icon">⚡</span>
+                        Precarga Rápida
+                    </button>
+                    <button type="button" id="fsc-clear-cache" class="fsc-btn fsc-btn-danger">
+                        <span class="fsc-btn-icon">🗑️</span>
+                        Limpiar Caché
+                    </button>
+                </div>
+                
+                <!-- Progreso de Generación -->
+                <div id="fsc-generation-progress" class="fsc-generation-progress" style="display: none;">
+                    <div class="fsc-progress-bar">
+                        <div class="fsc-progress-fill" style="width: 0%"></div>
+                    </div>
+                    <p id="fsc-generation-status">Iniciando generación...</p>
+                </div>
+            </div>
+            
+            <!-- Configuración Avanzada (Colapsable) -->
+            <div class="fsc-config-card">
+                <h3 class="fsc-collapsible" data-target="fsc-config-content">
+                    Configuración Avanzada <span class="fsc-arrow">▼</span>
+                </h3>
+                <div id="fsc-config-content" class="fsc-config-content" style="display: none;">
+                    <form method="post" action="options.php">
+                        <?php settings_fields('fsc_settings'); ?>
+                        
+                        <table class="form-table">
+                            <tr>
+                                <th scope="row">Tiempo de Vida del Caché</th>
+                                <td>
+                                    <input type="number" name="fsc_cache_lifetime" value="<?php echo get_option('fsc_cache_lifetime', 3600); ?>" min="60" step="60" />
+                                    <p class="description">Segundos antes de que expire el caché (3600 = 1 hora)</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Páginas Excluidas</th>
+                                <td>
+                                    <textarea name="fsc_excluded_pages" rows="3" cols="50"><?php echo esc_textarea(implode("\n", (array)get_option('fsc_excluded_pages', array()))); ?></textarea>
+                                    <p class="description">Una URL por línea (ej: /carrito, /checkout)</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">User Agents Excluidos</th>
+                                <td>
+                                    <textarea name="fsc_excluded_user_agents" rows="2" cols="50"><?php echo esc_textarea(implode("\n", (array)get_option('fsc_excluded_user_agents', array('bot', 'crawler', 'spider')))); ?></textarea>
+                                    <p class="description">User agents que no deben recibir caché</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Mostrar Info de Caché</th>
+                                <td>
+                                    <input type="checkbox" name="fsc_show_cache_info" value="1" <?php checked(get_option('fsc_show_cache_info', true)); ?> />
+                                    <label>Mostrar información en comentarios HTML</label>
+                                </td>
+                            </tr>
+                        </table>
+                        
+                        <?php submit_button(); ?>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+        .fsc-main-card, .fsc-actions-card, .fsc-config-card {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .fsc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .fsc-status h2 {
+            margin: 0 0 5px 0;
+            font-size: 20px;
+        }
+        
+        .fsc-status-text {
+            margin: 0;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .fsc-status-text.active {
+            color: #00a32a;
+        }
+        
+        .fsc-status-text.inactive {
+            color: #d63638;
+        }
+        
+        /* Switch Toggle Minimalista */
+        .fsc-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .fsc-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .fsc-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .fsc-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .fsc-slider {
+            background-color: #00a32a;
+        }
+        
+        input:checked + .fsc-slider:before {
+            transform: translateX(26px);
+        }
+        
+        /* Estadísticas Compactas */
+        .fsc-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .fsc-stat {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .fsc-stat-number {
+            display: block;
+            font-size: 24px;
+            font-weight: bold;
+            color: #0073aa;
+            margin-bottom: 5px;
+        }
+        
+        .fsc-stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Barra de Progreso */
+        .fsc-progress-container {
+            margin-bottom: 10px;
+        }
+        
+        .fsc-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #f0f0f1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        
+        .fsc-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0073aa, #005a87);
+            transition: width 0.3s ease;
+        }
+        
+        .fsc-progress-text {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        /* Botones Minimalistas */
+        .fsc-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .fsc-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        
+        .fsc-btn-primary {
+            background: #0073aa;
+            color: white;
+        }
+        
+        .fsc-btn-primary:hover {
+            background: #005a87;
+        }
+        
+        .fsc-btn-secondary {
+            background: #f0f0f1;
+            color: #333;
+        }
+        
+        .fsc-btn-secondary:hover {
+            background: #ddd;
+        }
+        
+        .fsc-btn-danger {
+            background: #d63638;
+            color: white;
+        }
+        
+        .fsc-btn-danger:hover {
+            background: #b32d2e;
+        }
+        
+        .fsc-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .fsc-btn-icon {
+            font-size: 16px;
+        }
+        
+        /* Progreso de Generación */
+        .fsc-generation-progress {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        /* Configuración Colapsable */
+        .fsc-collapsible {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 0 15px 0;
+        }
+        
+        .fsc-collapsible:hover {
+            color: #0073aa;
+        }
+        
+        .fsc-arrow {
+            transition: transform 0.3s;
+        }
+        
+        .fsc-arrow.rotated {
+            transform: rotate(180deg);
+        }
+        
+        .fsc-config-content {
+            transition: all 0.3s;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .fsc-header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .fsc-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .fsc-actions {
+                grid-template-columns: 1fr;
+            }
+        }
+        </style>
+        <?php
+    }
+    
+    private function format_bytes($bytes, $precision = 1) {
+        $units = array('B', 'KB', 'MB', 'GB');
+        
+        for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
+            $bytes /= 1024;
+        }
+        
+        return round($bytes, $precision) . ' ' . $units[$i];
+    }
+    
+    public function enqueue_scripts($hook) {
+        if ($hook !== 'settings_page_fast-static-cache') {
+            return;
+        }
+        
+        wp_enqueue_script(
+            'fsc-admin',
+            FSC_PLUGIN_URL . 'assets/admin.js',
+            array('jquery'),
+            FSC_VERSION,
+            true
+        );
+        
+        wp_localize_script('fsc-admin', 'fsc_ajax', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('fsc_nonce')
+        ));
+    }
+    
+    public function add_admin_bar_menu($wp_admin_bar) {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        
+        $stats = fsc_get_cache_stats();
+        
+        $wp_admin_bar->add_menu(array(
+            'id' => 'fsc-menu',
+            'title' => 'Estático (' . $stats['files'] . ')',
+            'href' => admin_url('options-general.php?page=fast-static-cache')
+        ));
+    }
+    
+    // AJAX Handlers
+    public function ajax_toggle_cache() {
+        check_ajax_referer('fsc_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Permisos insuficientes');
+        }
+        
+        $current_status = get_option('fsc_enabled', true);
+        $new_status = !$current_status;
+        
+        update_option('fsc_enabled', $new_status);
+        
+        wp_send_json_success(array(
+            'enabled' => $new_status,
+            'message' => $new_status ? 'Sistema activado' : 'Sistema desactivado'
+        ));
+    }
+    
+    public function ajax_generate_all_pages() {
+        check_ajax_referer('fsc_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Permisos insuficientes');
+        }
+        
+        // Aumentar límites
+        set_time_limit(0);
+        ini_set('memory_limit', '512M');
+        
+        $result = fsc_generate_all_static_pages();
+        
+        wp_send_json_success(array(
+            'message' => 'Generación completada',
+            'total' => $result['total'],
+            'success' => $result['success'],
+            'errors' => $result['errors']
+        ));
+    }
+    
+    public function ajax_clear_cache() {
+        check_ajax_referer('fsc_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Permisos insuficientes');
+        }
+        
+        $result = fsc_clear_all_cache();
+        
+        if ($result) {
+            wp_send_json_success('Caché limpiado exitosamente');
+        } else {
+            wp_send_json_error('Error al limpiar caché');
+        }
+    }
+    
+    public function ajax_get_stats() {
+        check_ajax_referer('fsc_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Permisos insuficientes');
+        }
+        
+        $stats = fsc_get_cache_stats();
+        wp_send_json_success($stats);
+    }
+    
+    public function ajax_preload_cache() {
+        check_ajax_referer('fsc_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Permisos insuficientes');
+        }
+        
+        $preloaded = fsc_preload_cache();
+        
+        wp_send_json_success(array(
+            'message' => 'Precarga completada',
+            'pages' => $preloaded
+        ));
+    }
+}
