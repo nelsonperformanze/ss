@@ -1,13 +1,13 @@
 <?php
 /**
- * Plugin Name: Fast Static Cache Pro
- * Plugin URI: https://github.com/yourname/fast-static-cache
- * Description: Sistema avanzado de caché estático con optimización inteligente usando TensorFlow.js y análisis adaptativo.
+ * Plugin Name: StaticBoost Pro
+ * Plugin URI: https://github.com/yourname/staticboost-pro
+ * Description: Convierte tu sitio WordPress en páginas estáticas ultrarrápidas con optimización inteligente usando BoostAI™ (nuestro sistema de Machine Learning propietario).
  * Version: 2.0.0
  * Author: Tu Nombre
  * Author URI: https://tusitio.com
  * License: GPL v2 or later
- * Text Domain: fast-static-cache
+ * Text Domain: staticboost-pro
  * Requires PHP: 7.4
  * WC requires at least: 3.0
  * WC tested up to: 8.0
@@ -19,53 +19,57 @@ if (!defined('ABSPATH')) {
 }
 
 // Definir constantes
-define('FSC_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('FSC_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('FSC_CACHE_DIR', WP_CONTENT_DIR . '/cache/fast-static-cache/');
-define('FSC_ASSETS_DIR', FSC_CACHE_DIR . 'assets/');
-define('FSC_ML_DIR', FSC_PLUGIN_PATH . 'ml/');
-define('FSC_VERSION', '2.0.0');
+define('SBP_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('SBP_PLUGIN_PATH', plugin_dir_path(__FILE__));
+define('SBP_CACHE_DIR', WP_CONTENT_DIR . '/cache/staticboost-pro/');
+define('SBP_ASSETS_DIR', SBP_CACHE_DIR . 'assets/');
+define('SBP_ML_DIR', SBP_PLUGIN_PATH . 'ml/');
+define('SBP_VERSION', '2.0.0');
 
 // Incluir archivos necesarios
-require_once FSC_PLUGIN_PATH . 'includes/class-fast-static-cache.php';
-require_once FSC_PLUGIN_PATH . 'includes/class-admin.php';
-require_once FSC_PLUGIN_PATH . 'includes/class-woocommerce-compat.php';
-require_once FSC_PLUGIN_PATH . 'includes/class-ml-optimizer.php';
-require_once FSC_PLUGIN_PATH . 'includes/class-asset-optimizer.php';
-require_once FSC_PLUGIN_PATH . 'includes/functions.php';
+require_once SBP_PLUGIN_PATH . 'includes/class-staticboost-core.php';
+require_once SBP_PLUGIN_PATH . 'includes/class-admin.php';
+require_once SBP_PLUGIN_PATH . 'includes/class-woocommerce-compat.php';
+require_once SBP_PLUGIN_PATH . 'includes/class-boostai-optimizer.php';
+require_once SBP_PLUGIN_PATH . 'includes/class-pagespeed-optimizer.php';
+require_once SBP_PLUGIN_PATH . 'includes/class-asset-optimizer.php';
+require_once SBP_PLUGIN_PATH . 'includes/functions.php';
 
 // Inicializar el plugin
-function fsc_init() {
-    new Fast_Static_Cache();
+function sbp_init() {
+    new StaticBoost_Core();
     
     if (is_admin()) {
-        new FSC_Admin();
+        new SBP_Admin();
     }
     
     // Compatibilidad WooCommerce
     if (class_exists('WooCommerce')) {
-        new FSC_WooCommerce_Compat();
+        new SBP_WooCommerce_Compat();
     }
     
-    // Optimizador ML
-    new FSC_ML_Optimizer();
+    // BoostAI™ Optimizer
+    new SBP_BoostAI_Optimizer();
     
-    // Optimizador de assets
-    new FSC_Asset_Optimizer();
+    // PageSpeed Optimizer
+    new SBP_PageSpeed_Optimizer();
+    
+    // Asset Optimizer
+    new SBP_Asset_Optimizer();
 }
-add_action('plugins_loaded', 'fsc_init');
+add_action('plugins_loaded', 'sbp_init');
 
 // Activación del plugin
-register_activation_hook(__FILE__, 'fsc_activate');
-function fsc_activate() {
+register_activation_hook(__FILE__, 'sbp_activate');
+function sbp_activate() {
     // Crear directorios necesarios
     $directories = [
-        FSC_CACHE_DIR,
-        FSC_ASSETS_DIR,
-        FSC_CACHE_DIR . 'css/',
-        FSC_CACHE_DIR . 'js/',
-        FSC_CACHE_DIR . 'images/',
-        FSC_CACHE_DIR . 'fonts/'
+        SBP_CACHE_DIR,
+        SBP_ASSETS_DIR,
+        SBP_CACHE_DIR . 'css/',
+        SBP_CACHE_DIR . 'js/',
+        SBP_CACHE_DIR . 'images/',
+        SBP_CACHE_DIR . 'fonts/'
     ];
     
     foreach ($directories as $dir) {
@@ -74,58 +78,69 @@ function fsc_activate() {
         }
     }
     
-    // Crear tablas para ML analytics
-    fsc_create_analytics_tables();
+    // Crear tablas para BoostAI analytics
+    sbp_create_analytics_tables();
     
-    // Crear archivo .htaccess optimizado
-    fsc_create_optimized_htaccess();
+    // Crear archivo .htaccess optimizado para PageSpeed
+    sbp_create_pagespeed_htaccess();
     
-    // Configuración por defecto
-    add_option('fsc_enabled', true);
-    add_option('fsc_cache_lifetime', 3600);
-    add_option('fsc_excluded_pages', array('/cart', '/checkout', '/my-account'));
-    add_option('fsc_excluded_user_agents', array('bot', 'crawler', 'spider'));
-    add_option('fsc_show_cache_info', true);
-    add_option('fsc_ml_enabled', true);
-    add_option('fsc_asset_optimization', true);
-    add_option('fsc_image_optimization', true);
-    add_option('fsc_critical_css', true);
+    // Configuración por defecto optimizada para PageSpeed
+    add_option('sbp_enabled', true);
+    add_option('sbp_cache_lifetime', 3600);
+    add_option('sbp_excluded_pages', array('/cart', '/checkout', '/my-account'));
+    add_option('sbp_excluded_user_agents', array('bot', 'crawler', 'spider'));
+    add_option('sbp_show_cache_info', true);
+    add_option('sbp_boostai_enabled', true);
+    add_option('sbp_asset_optimization', true);
+    add_option('sbp_aggressive_optimization', false);
+    add_option('sbp_image_optimization', true);
+    add_option('sbp_critical_css', true);
+    add_option('sbp_pagespeed_mode', true); // NUEVO: Modo PageSpeed
+    add_option('sbp_preload_critical_resources', true);
+    add_option('sbp_eliminate_render_blocking', true);
+    add_option('sbp_optimize_lcp', true);
+    add_option('sbp_minimize_main_thread', true);
     
     // Programar tareas de optimización
-    if (!wp_next_scheduled('fsc_ml_analysis')) {
-        wp_schedule_event(time(), 'hourly', 'fsc_ml_analysis');
+    if (!wp_next_scheduled('sbp_boostai_analysis')) {
+        wp_schedule_event(time(), 'hourly', 'sbp_boostai_analysis');
     }
     
-    if (!wp_next_scheduled('fsc_asset_optimization')) {
-        wp_schedule_event(time(), 'daily', 'fsc_asset_optimization');
+    if (!wp_next_scheduled('sbp_asset_optimization')) {
+        wp_schedule_event(time(), 'daily', 'sbp_asset_optimization');
+    }
+    
+    if (!wp_next_scheduled('sbp_pagespeed_optimization')) {
+        wp_schedule_event(time(), 'twicedaily', 'sbp_pagespeed_optimization');
     }
 }
 
 // Desactivación del plugin
-register_deactivation_hook(__FILE__, 'fsc_deactivate');
-function fsc_deactivate() {
+register_deactivation_hook(__FILE__, 'sbp_deactivate');
+function sbp_deactivate() {
     // Limpiar caché
-    fsc_clear_all_cache();
+    sbp_clear_all_cache();
     
     // Eliminar tareas programadas
-    wp_clear_scheduled_hook('fsc_ml_analysis');
-    wp_clear_scheduled_hook('fsc_asset_optimization');
+    wp_clear_scheduled_hook('sbp_boostai_analysis');
+    wp_clear_scheduled_hook('sbp_asset_optimization');
+    wp_clear_scheduled_hook('sbp_pagespeed_optimization');
     
     // Eliminar .htaccess
-    $htaccess_path = FSC_CACHE_DIR . '.htaccess';
+    $htaccess_path = SBP_CACHE_DIR . '.htaccess';
     if (file_exists($htaccess_path)) {
         unlink($htaccess_path);
     }
 }
 
-// Crear tablas para analytics ML
-function fsc_create_analytics_tables() {
+// Crear tablas para analytics BoostAI
+function sbp_create_analytics_tables() {
     global $wpdb;
     
     $charset_collate = $wpdb->get_charset_collate();
     
     // Tabla para métricas de usuario
-    $table_metrics = $wpdb->prefix . 'fsc_user_metrics';
+    $table_metrics = $wpdb->prefix . 'sbp_user_metrics';
     $sql_metrics = "CREATE TABLE $table_metrics (
         id bigint(20) NOT NULL AUTO_INCREMENT,
         session_id varchar(32) NOT NULL,
@@ -147,7 +162,7 @@ function fsc_create_analytics_tables() {
     ) $charset_collate;";
     
     // Tabla para configuraciones adaptativas
-    $table_config = $wpdb->prefix . 'fsc_adaptive_config';
+    $table_config = $wpdb->prefix . 'sbp_adaptive_config';
     $sql_config = "CREATE TABLE $table_config (
         id bigint(20) NOT NULL AUTO_INCREMENT,
         config_key varchar(100) NOT NULL,
@@ -164,10 +179,10 @@ function fsc_create_analytics_tables() {
     dbDelta($sql_config);
 }
 
-// Crear .htaccess optimizado para máximo rendimiento
-function fsc_create_optimized_htaccess() {
+// Crear .htaccess optimizado para PageSpeed 100/100
+function sbp_create_pagespeed_htaccess() {
     $htaccess_content = '
-# Fast Static Cache Pro - Ultra Performance Rules
+# StaticBoost Pro - PageSpeed 100/100 Optimization
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
@@ -190,16 +205,16 @@ RewriteCond %{REQUEST_FILENAME} !-d
 
 # Para página principal
 RewriteCond %{REQUEST_URI} ^/$
-RewriteCond %{DOCUMENT_ROOT}/wp-content/cache/fast-static-cache/index/index.html -f
-RewriteRule ^$ wp-content/cache/fast-static-cache/index/index.html [L]
+RewriteCond %{DOCUMENT_ROOT}/wp-content/cache/staticboost-pro/index/index.html -f
+RewriteRule ^$ wp-content/cache/staticboost-pro/index/index.html [L]
 
 # Para otras páginas
 RewriteCond %{REQUEST_URI} !^/$
-RewriteCond %{DOCUMENT_ROOT}/wp-content/cache/fast-static-cache%{REQUEST_URI}/index.html -f
-RewriteRule ^(.*)$ wp-content/cache/fast-static-cache/$1/index.html [L]
+RewriteCond %{DOCUMENT_ROOT}/wp-content/cache/staticboost-pro%{REQUEST_URI}/index.html -f
+RewriteRule ^(.*)$ wp-content/cache/staticboost-pro/$1/index.html [L]
 </IfModule>
 
-# Headers para máximo rendimiento
+# Headers para PageSpeed 100/100
 <IfModule mod_expires.c>
 ExpiresActive On
 ExpiresByType text/html "access plus 1 hour"
@@ -213,27 +228,48 @@ ExpiresByType image/webp "access plus 1 year"
 ExpiresByType image/avif "access plus 1 year"
 ExpiresByType font/woff "access plus 1 year"
 ExpiresByType font/woff2 "access plus 1 year"
+ExpiresByType image/svg+xml "access plus 1 year"
 </IfModule>
 
-# Compresión avanzada
+# Compresión máxima para PageSpeed
 <IfModule mod_deflate.c>
-AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
+AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml text/xml application/xml application/rss+xml
+SetOutputFilter DEFLATE
+SetEnvIfNoCase Request_URI \
+    \.(?:gif|jpe?g|png|webp|avif)$ no-gzip dont-vary
+SetEnvIfNoCase Request_URI \
+    \.(?:exe|t?gz|zip|bz2|sit|rar)$ no-gzip dont-vary
 </IfModule>
 
 # Brotli compression (si está disponible)
 <IfModule mod_brotli.c>
-AddOutputFilterByType BROTLI_COMPRESS text/html text/css text/javascript application/javascript application/json
+AddOutputFilterByType BROTLI_COMPRESS text/html text/css text/javascript application/javascript application/json image/svg+xml
 </IfModule>
 
-# Headers de caché optimizados
+# Headers de caché optimizados para PageSpeed
 <IfModule mod_headers.c>
 Header set X-Static-Cache "HIT"
-Header set Cache-Control "public, max-age=31536000, immutable" "expr=%{REQUEST_URI} =~ m#\.(css|js|png|jpg|jpeg|gif|webp|avif|woff|woff2)$#"
+Header set X-Powered-By "StaticBoost Pro"
+Header set Cache-Control "public, max-age=31536000, immutable" "expr=%{REQUEST_URI} =~ m#\.(css|js|png|jpg|jpeg|gif|webp|avif|woff|woff2|svg)$#"
 Header set Cache-Control "public, max-age=3600" "expr=%{REQUEST_URI} =~ m#\.html$#"
 
-# Preload headers para recursos críticos
-Header add Link "</wp-content/cache/fast-static-cache/css/critical.css>; rel=preload; as=style"
-Header add Link "</wp-content/cache/fast-static-cache/js/ml-optimizer.js>; rel=preload; as=script"
+# Preload headers críticos para LCP
+Header add Link "</wp-content/cache/staticboost-pro/css/critical.css>; rel=preload; as=style"
+Header add Link "<https://fonts.googleapis.com>; rel=preconnect"
+Header add Link "<https://fonts.gstatic.com>; rel=preconnect; crossorigin"
+
+# Security headers
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Optimización de fuentes para PageSpeed
+<IfModule mod_headers.c>
+<FilesMatch "\.(woff|woff2|eot|ttf)$">
+Header set Cache-Control "public, max-age=31536000, immutable"
+Header set Access-Control-Allow-Origin "*"
+</FilesMatch>
 </IfModule>
 
 # Seguridad adicional
@@ -243,16 +279,16 @@ Deny from all
 </Files>
 ';
     
-    file_put_contents(FSC_CACHE_DIR . '.htaccess', $htaccess_content);
+    file_put_contents(SBP_CACHE_DIR . '.htaccess', $htaccess_content);
     
     // También crear .htaccess en la raíz para redirigir a archivos estáticos
     $root_htaccess = ABSPATH . '.htaccess';
     $existing_content = file_exists($root_htaccess) ? file_get_contents($root_htaccess) : '';
     
     // Solo agregar si no existe ya
-    if (strpos($existing_content, '# Fast Static Cache Pro') === false) {
+    if (strpos($existing_content, '# StaticBoost Pro') === false) {
         $static_rules = '
-# Fast Static Cache Pro - Servir archivos estáticos ANTES que WordPress
+# StaticBoost Pro - Servir archivos estáticos ANTES que WordPress
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
@@ -273,16 +309,16 @@ RewriteCond %{REQUEST_URI} !^/my-account/
 
 # Para página principal
 RewriteCond %{REQUEST_URI} ^/$
-RewriteCond %{DOCUMENT_ROOT}/wp-content/cache/fast-static-cache/index/index.html -f
-RewriteRule ^$ wp-content/cache/fast-static-cache/index/index.html [L]
+RewriteCond %{DOCUMENT_ROOT}/wp-content/cache/staticboost-pro/index/index.html -f
+RewriteRule ^$ wp-content/cache/staticboost-pro/index/index.html [L]
 
 # Para otras páginas
 RewriteCond %{REQUEST_URI} !^/$
-RewriteCond %{DOCUMENT_ROOT}/wp-content/cache/fast-static-cache%{REQUEST_URI}/index.html -f
-RewriteRule ^(.*)$ wp-content/cache/fast-static-cache/$1/index.html [L]
+RewriteCond %{DOCUMENT_ROOT}/wp-content/cache/staticboost-pro%{REQUEST_URI}/index.html -f
+RewriteRule ^(.*)$ wp-content/cache/staticboost-pro/$1/index.html [L]
 </IfModule>
 
-# Fin Fast Static Cache Pro
+# Fin StaticBoost Pro
 
 ';
         
@@ -290,6 +326,7 @@ RewriteRule ^(.*)$ wp-content/cache/fast-static-cache/$1/index.html [L]
     }
 }
 
-// Hooks para análisis ML
-add_action('fsc_ml_analysis', 'fsc_run_ml_analysis');
-add_action('fsc_asset_optimization', 'fsc_run_asset_optimization');
+// Hooks para análisis BoostAI
+add_action('sbp_boostai_analysis', 'sbp_run_boostai_analysis');
+add_action('sbp_asset_optimization', 'sbp_run_asset_optimization');
+add_action('sbp_pagespeed_optimization', 'sbp_run_pagespeed_optimization');
