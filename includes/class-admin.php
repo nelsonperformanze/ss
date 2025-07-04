@@ -37,6 +37,7 @@ class FSC_Admin {
         register_setting('fsc_settings', 'fsc_show_cache_info');
         register_setting('fsc_settings', 'fsc_ml_enabled');
         register_setting('fsc_settings', 'fsc_asset_optimization');
+        register_setting('fsc_settings', 'fsc_aggressive_optimization');
         register_setting('fsc_settings', 'fsc_image_optimization');
         register_setting('fsc_settings', 'fsc_critical_css');
     }
@@ -47,10 +48,11 @@ class FSC_Admin {
         $enabled = get_option('fsc_enabled', true);
         $ml_enabled = get_option('fsc_ml_enabled', true);
         $asset_optimization = get_option('fsc_asset_optimization', true);
+        $aggressive_optimization = get_option('fsc_aggressive_optimization', false);
         $progress_percent = $total_pages['total'] > 0 ? round(($stats['files'] / $total_pages['total']) * 100, 1) : 0;
         ?>
         <div class="wrap">
-            <h1>Fast Static Cache Pro</h1>
+            <h1>🚀 Fast Static Cache Pro</h1>
             
             <!-- Control Principal -->
             <div class="fsc-main-card">
@@ -154,24 +156,35 @@ class FSC_Admin {
                                 <th scope="row">Optimización de Assets</th>
                                 <td>
                                     <input type="checkbox" name="fsc_asset_optimization" value="1" <?php checked(get_option('fsc_asset_optimization', true)); ?> />
-                                    <label>Minificar y combinar CSS/JS automáticamente</label>
-                                    <p class="description">Combina y minifica archivos CSS y JavaScript para reducir requests HTTP</p>
+                                    <label>Activar optimización básica de assets (RECOMENDADO)</label>
+                                    <p class="description">Optimizaciones seguras: lazy loading inteligente, preload headers, compresión de imágenes</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">⚠️ Optimización Agresiva</th>
+                                <td>
+                                    <input type="checkbox" name="fsc_aggressive_optimization" value="1" <?php checked(get_option('fsc_aggressive_optimization', false)); ?> />
+                                    <label><strong>Activar optimización agresiva (EXPERIMENTAL)</strong></label>
+                                    <p class="description" style="color: #d63638;">
+                                        <strong>ADVERTENCIA:</strong> Puede romper el diseño del sitio. Solo activar si sabes lo que haces.<br>
+                                        Incluye: minificación y combinación de CSS/JS, modificación de assets del tema.
+                                    </p>
                                 </td>
                             </tr>
                             <tr>
                                 <th scope="row">Optimización de Imágenes</th>
                                 <td>
                                     <input type="checkbox" name="fsc_image_optimization" value="1" <?php checked(get_option('fsc_image_optimization', true)); ?> />
-                                    <label>Generar formatos WebP y AVIF automáticamente</label>
-                                    <p class="description">Convierte imágenes a formatos modernos para mejor compresión</p>
+                                    <label>Generar formatos WebP automáticamente</label>
+                                    <p class="description">Convierte imágenes a formato WebP para mejor compresión (solo imágenes de uploads)</p>
                                 </td>
                             </tr>
                             <tr>
                                 <th scope="row">CSS Crítico</th>
                                 <td>
                                     <input type="checkbox" name="fsc_critical_css" value="1" <?php checked(get_option('fsc_critical_css', true)); ?> />
-                                    <label>Generar CSS crítico inline automáticamente</label>
-                                    <p class="description">Inline del CSS crítico para eliminar render-blocking</p>
+                                    <label>Generar CSS crítico básico</label>
+                                    <p class="description">CSS crítico seguro para mejorar la carga inicial</p>
                                 </td>
                             </tr>
                             <tr>
@@ -223,13 +236,25 @@ class FSC_Admin {
                     </div>
                     <div class="fsc-info-item">
                         <strong>Optimización de Assets:</strong> 
-                        <?php echo $asset_optimization ? '✅ Activa' : '❌ Inactiva'; ?>
+                        <?php 
+                        if ($asset_optimization) {
+                            echo $aggressive_optimization ? '⚠️ Modo Agresivo' : '✅ Modo Seguro';
+                        } else {
+                            echo '❌ Deshabilitada';
+                        }
+                        ?>
                     </div>
                     <div class="fsc-info-item">
                         <strong>Última generación:</strong> 
                         <?php echo $stats['last_generated'] ? $stats['last_generated'] : 'Nunca'; ?>
                     </div>
                 </div>
+                
+                <?php if ($aggressive_optimization): ?>
+                <div class="fsc-warning">
+                    <p><strong>⚠️ ADVERTENCIA:</strong> El modo agresivo está activado. Si experimentas problemas visuales, desactívalo.</p>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
         
@@ -280,8 +305,8 @@ class FSC_Admin {
         .fsc-switch {
             position: relative;
             display: inline-block;
-            width: 60px;
-            height: 34px;
+            width: 50px;
+            height: 28px;
         }
         
         .fsc-switch input {
@@ -299,14 +324,14 @@ class FSC_Admin {
             bottom: 0;
             background-color: #ccc;
             transition: .4s;
-            border-radius: 34px;
+            border-radius: 28px;
         }
         
         .fsc-slider:before {
             position: absolute;
             content: "";
-            height: 26px;
-            width: 26px;
+            height: 20px;
+            width: 20px;
             left: 4px;
             bottom: 4px;
             background-color: white;
@@ -319,7 +344,7 @@ class FSC_Admin {
         }
         
         input:checked + .fsc-slider:before {
-            transform: translateX(26px);
+            transform: translateX(22px);
         }
         
         /* Estadísticas */
@@ -492,6 +517,16 @@ class FSC_Admin {
             font-size: 14px;
         }
         
+        /* Warning */
+        .fsc-warning {
+            margin-top: 15px;
+            padding: 10px;
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            color: #856404;
+        }
+        
         /* Responsive */
         @media (max-width: 768px) {
             .fsc-header {
@@ -660,8 +695,10 @@ class FSC_Admin {
             // Ejecutar optimización de assets
             fsc_run_asset_optimization();
             
+            $mode = get_option('fsc_aggressive_optimization', false) ? 'agresivo' : 'seguro';
+            
             wp_send_json_success(array(
-                'message' => 'Optimización de assets completada'
+                'message' => "Optimización de assets completada (modo {$mode})"
             ));
         } catch (Exception $e) {
             wp_send_json_error('Error durante la optimización: ' . $e->getMessage());
