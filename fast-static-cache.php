@@ -36,6 +36,17 @@ require_once SBP_PLUGIN_PATH . 'includes/class-asset-optimizer.php';
 require_once SBP_PLUGIN_PATH . 'includes/class-visual-builder-compat.php';
 require_once SBP_PLUGIN_PATH . 'includes/functions.php';
 
+// Declarar compatibilidad con WooCommerce HPOS antes de init
+add_action('before_woocommerce_init', function() {
+    if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+            'custom_order_tables',
+            __FILE__,
+            true
+        );
+    }
+});
+
 // Inicializar el plugin
 function sbp_init() {
     new StaticBoost_Core();

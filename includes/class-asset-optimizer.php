@@ -1,16 +1,16 @@
 <?php
 /**
- * Optimizador de Assets Estáticos - Versión Conservadora
+ * Optimizador de Assets Estáticos - StaticBoost Pro
  */
-class FSC_Asset_Optimizer {
+class SBP_Asset_Optimizer {
     
     private $optimized_assets = array();
     private $critical_scripts = array();
     private $critical_styles = array();
     
     public function __construct() {
-        add_action('fsc_asset_optimization', array($this, 'optimize_all_assets'));
-        add_filter('fsc_static_html', array($this, 'optimize_html_assets'), 10, 2);
+        add_action('sbp_asset_optimization', array($this, 'optimize_all_assets'));
+        add_filter('sbp_static_html', array($this, 'optimize_html_assets'), 10, 2);
         add_action('wp_enqueue_scripts', array($this, 'optimize_frontend_assets'));
         
         // Definir assets críticos que NO deben ser modificados
@@ -33,12 +33,12 @@ class FSC_Asset_Optimizer {
      * Optimizar todos los assets (ejecutado por cron) - MODO CONSERVADOR
      */
     public function optimize_all_assets() {
-        if (!get_option('fsc_asset_optimization', true)) {
+        if (!get_option('sbp_asset_optimization', true)) {
             return;
         }
         
         // Solo optimizar si está explícitamente habilitado
-        if (!get_option('fsc_aggressive_optimization', false)) {
+        if (!get_option('sbp_aggressive_optimization', false)) {
             // Modo conservador - solo optimizaciones básicas
             $this->optimize_images_only();
             $this->generate_critical_css_basic();
@@ -56,11 +56,11 @@ class FSC_Asset_Optimizer {
      * Optimización conservadora - solo imágenes
      */
     private function optimize_images_only() {
-        if (!get_option('fsc_image_optimization', true)) {
+        if (!get_option('sbp_image_optimization', true)) {
             return;
         }
         
-        $images_dir = FSC_CACHE_DIR . 'images/';
+        $images_dir = SBP_CACHE_DIR . 'images/';
         
         if (!file_exists($images_dir)) {
             wp_mkdir_p($images_dir);
@@ -97,7 +97,7 @@ class FSC_Asset_Optimizer {
                 }
             }
         } catch (Exception $e) {
-            error_log('FSC Error scanning images: ' . $e->getMessage());
+            error_log('SBP Error scanning images: ' . $e->getMessage());
         }
         
         return $images;
@@ -107,7 +107,7 @@ class FSC_Asset_Optimizer {
      * CSS crítico básico (sin modificar archivos existentes)
      */
     private function generate_critical_css_basic() {
-        $critical_css_file = FSC_CACHE_DIR . 'css/critical.css';
+        $critical_css_file = SBP_CACHE_DIR . 'css/critical.css';
         
         if (!file_exists(dirname($critical_css_file))) {
             wp_mkdir_p(dirname($critical_css_file));
@@ -117,9 +117,9 @@ class FSC_Asset_Optimizer {
         $critical_css = '
         /* Critical CSS - Safe optimizations only */
         img { max-width: 100%; height: auto; }
-        .fsc-loaded { opacity: 1 !important; transition: opacity 0.3s ease-in-out; }
+        .sbp-loaded { opacity: 1 !important; transition: opacity 0.3s ease-in-out; }
         img[data-src] { opacity: 0; transition: opacity 0.3s ease-in-out; }
-        img[data-src].fsc-loaded { opacity: 1; }
+        img[data-src].sbp-loaded { opacity: 1; }
         ';
         
         $critical_css = $this->minify_css($critical_css);
@@ -130,7 +130,7 @@ class FSC_Asset_Optimizer {
      * Optimizar HTML con assets - MODO CONSERVADOR
      */
     public function optimize_html_assets($html, $url) {
-        if (!get_option('fsc_asset_optimization', true)) {
+        if (!get_option('sbp_asset_optimization', true)) {
             return $html;
         }
         
@@ -140,14 +140,14 @@ class FSC_Asset_Optimizer {
         $html = $this->optimize_images_in_html_safe($html);
         
         // Solo si está en modo agresivo
-        if (get_option('fsc_aggressive_optimization', false)) {
+        if (get_option('sbp_aggressive_optimization', false)) {
             if (isset($this->optimized_assets['css'])) {
-                $css_url = str_replace(FSC_CACHE_DIR, content_url('cache/fast-static-cache/'), $this->optimized_assets['css']);
+                $css_url = str_replace(SBP_CACHE_DIR, content_url('cache/staticboost-pro/'), $this->optimized_assets['css']);
                 $html = $this->replace_css_links_safe($html, $css_url);
             }
             
             if (isset($this->optimized_assets['js'])) {
-                $js_url = str_replace(FSC_CACHE_DIR, content_url('cache/fast-static-cache/'), $this->optimized_assets['js']);
+                $js_url = str_replace(SBP_CACHE_DIR, content_url('cache/staticboost-pro/'), $this->optimized_assets['js']);
                 $html = $this->replace_js_scripts_safe($html, $js_url);
             }
         }
@@ -324,7 +324,7 @@ class FSC_Asset_Optimizer {
                 return $result;
             }
         } catch (Exception $e) {
-            error_log('FSC Error converting to WebP: ' . $e->getMessage());
+            error_log('SBP Error converting to WebP: ' . $e->getMessage());
         }
         
         return false;
@@ -335,7 +335,7 @@ class FSC_Asset_Optimizer {
      */
     private function optimize_css_files() {
         // Solo ejecutar si está en modo agresivo
-        $css_dir = FSC_CACHE_DIR . 'css/';
+        $css_dir = SBP_CACHE_DIR . 'css/';
         
         if (!file_exists($css_dir)) {
             wp_mkdir_p($css_dir);
@@ -390,7 +390,7 @@ class FSC_Asset_Optimizer {
      * Optimizar JS files (solo en modo agresivo)
      */
     private function optimize_js_files() {
-        $js_dir = FSC_CACHE_DIR . 'js/';
+        $js_dir = SBP_CACHE_DIR . 'js/';
         
         if (!file_exists($js_dir)) {
             wp_mkdir_p($js_dir);
@@ -467,7 +467,7 @@ class FSC_Asset_Optimizer {
      * Optimizar assets del frontend
      */
     public function optimize_frontend_assets() {
-        if (!get_option('fsc_asset_optimization', true) || is_admin()) {
+        if (!get_option('sbp_asset_optimization', true) || is_admin()) {
             return;
         }
         
