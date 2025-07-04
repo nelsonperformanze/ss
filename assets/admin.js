@@ -2,16 +2,16 @@ jQuery(document).ready(function($) {
     let generationInProgress = false;
     
     // Toggle del sistema de caché
-    $('#fsc-toggle-cache').on('change', function() {
+    $('#sbp-toggle-cache').on('change', function() {
         const checkbox = $(this);
         const isEnabled = checkbox.is(':checked');
         
         $.ajax({
-            url: fsc_ajax.ajax_url,
+            url: sbp_ajax.ajax_url,
             type: 'POST',
             data: {
-                action: 'fsc_toggle_cache',
-                nonce: fsc_ajax.nonce
+                action: 'sbp_toggle_cache',
+                nonce: sbp_ajax.nonce
             },
             beforeSend: function() {
                 checkbox.prop('disabled', true);
@@ -19,11 +19,11 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.success) {
                     // Actualizar estado visual
-                    const statusText = $('.fsc-status-text');
+                    const statusText = $('.sbp-status-text');
                     if (response.data.enabled) {
-                        statusText.text('● Activo').removeClass('inactive').addClass('active');
+                        statusText.text('🟢 Activo').removeClass('inactive').addClass('active');
                     } else {
-                        statusText.text('● Inactivo').removeClass('active').addClass('inactive');
+                        statusText.text('🔴 Inactivo').removeClass('active').addClass('inactive');
                     }
                     
                     showNotification('✅ ' + response.data.message, 'success');
@@ -46,23 +46,23 @@ jQuery(document).ready(function($) {
     });
     
     // Generar todas las páginas
-    $('#fsc-generate-all').on('click', function() {
+    $('#sbp-generate-all').on('click', function() {
         if (generationInProgress) {
             return;
         }
         
         const button = $(this);
         const originalText = button.html();
-        const progressContainer = $('#fsc-generation-progress');
-        const progressBar = progressContainer.find('.fsc-progress-fill');
-        const statusText = $('#fsc-generation-status');
+        const progressContainer = $('#sbp-generation-progress');
+        const progressBar = progressContainer.find('.sbp-progress-fill');
+        const statusText = $('#sbp-generation-status');
         
-        if (!confirm('¿Generar TODAS las páginas estáticas? Esto puede tomar varios minutos y usar recursos del servidor.')) {
+        if (!confirm('¿Convertir TODAS las páginas a estáticas? Esto puede tomar varios minutos y usar recursos del servidor.')) {
             return;
         }
         
         generationInProgress = true;
-        button.html('<span class="fsc-btn-icon">⏳</span> Generando...').prop('disabled', true);
+        button.html('<span class="sbp-btn-icon">⏳</span> Generando...').prop('disabled', true);
         progressContainer.show();
         
         // Simular progreso
@@ -76,11 +76,11 @@ jQuery(document).ready(function($) {
         }, 2000);
         
         $.ajax({
-            url: fsc_ajax.ajax_url,
+            url: sbp_ajax.ajax_url,
             type: 'POST',
             data: {
-                action: 'fsc_generate_all_pages',
-                nonce: fsc_ajax.nonce
+                action: 'sbp_generate_all_pages',
+                nonce: sbp_ajax.nonce
             },
             timeout: 600000, // 10 minutos
             success: function(response) {
@@ -122,18 +122,18 @@ jQuery(document).ready(function($) {
     });
     
     // Precarga rápida
-    $('#fsc-preload-cache').on('click', function() {
+    $('#sbp-preload-cache').on('click', function() {
         const button = $(this);
         const originalText = button.html();
         
-        button.html('<span class="fsc-btn-icon">⏳</span> Precargando...').prop('disabled', true);
+        button.html('<span class="sbp-btn-icon">⏳</span> Precargando...').prop('disabled', true);
         
         $.ajax({
-            url: fsc_ajax.ajax_url,
+            url: sbp_ajax.ajax_url,
             type: 'POST',
             data: {
-                action: 'fsc_preload_cache',
-                nonce: fsc_ajax.nonce
+                action: 'sbp_preload_cache',
+                nonce: sbp_ajax.nonce
             },
             timeout: 120000, // 2 minutos
             success: function(response) {
@@ -155,18 +155,18 @@ jQuery(document).ready(function($) {
     });
     
     // Optimizar assets
-    $('#fsc-optimize-assets').on('click', function() {
+    $('#sbp-optimize-assets').on('click', function() {
         const button = $(this);
         const originalText = button.html();
         
-        button.html('<span class="fsc-btn-icon">⏳</span> Optimizando...').prop('disabled', true);
+        button.html('<span class="sbp-btn-icon">⏳</span> Optimizando...').prop('disabled', true);
         
         $.ajax({
-            url: fsc_ajax.ajax_url,
+            url: sbp_ajax.ajax_url,
             type: 'POST',
             data: {
-                action: 'fsc_optimize_assets',
-                nonce: fsc_ajax.nonce
+                action: 'sbp_optimize_assets',
+                nonce: sbp_ajax.nonce
             },
             timeout: 180000, // 3 minutos
             success: function(response) {
@@ -188,7 +188,7 @@ jQuery(document).ready(function($) {
     });
     
     // Limpiar caché
-    $('#fsc-clear-cache').on('click', function() {
+    $('#sbp-clear-cache').on('click', function() {
         const button = $(this);
         const originalText = button.html();
         
@@ -196,14 +196,14 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        button.html('<span class="fsc-btn-icon">⏳</span> Limpiando...').prop('disabled', true);
+        button.html('<span class="sbp-btn-icon">⏳</span> Limpiando...').prop('disabled', true);
         
         $.ajax({
-            url: fsc_ajax.ajax_url,
+            url: sbp_ajax.ajax_url,
             type: 'POST',
             data: {
-                action: 'fsc_clear_cache',
-                nonce: fsc_ajax.nonce
+                action: 'sbp_clear_cache',
+                nonce: sbp_ajax.nonce
             },
             success: function(response) {
                 if (response.success) {
@@ -224,10 +224,10 @@ jQuery(document).ready(function($) {
     });
     
     // Configuración colapsable
-    $('.fsc-collapsible').on('click', function() {
+    $('.sbp-collapsible').on('click', function() {
         const target = $(this).data('target');
         const content = $('#' + target);
-        const arrow = $(this).find('.fsc-arrow');
+        const arrow = $(this).find('.sbp-arrow');
         
         content.slideToggle();
         arrow.toggleClass('rotated');
@@ -236,17 +236,17 @@ jQuery(document).ready(function($) {
     // Función para mostrar notificaciones
     function showNotification(message, type = 'info') {
         const notification = $(`
-            <div class="fsc-notification fsc-notification-${type}">
+            <div class="sbp-notification sbp-notification-${type}">
                 ${message}
-                <button class="fsc-notification-close">&times;</button>
+                <button class="sbp-notification-close">&times;</button>
             </div>
         `);
         
         // Agregar estilos si no existen
-        if (!$('#fsc-notification-styles').length) {
+        if (!$('#sbp-notification-styles').length) {
             $('head').append(`
-                <style id="fsc-notification-styles">
-                .fsc-notification {
+                <style id="sbp-notification-styles">
+                .sbp-notification {
                     position: fixed;
                     top: 32px;
                     right: 20px;
@@ -257,15 +257,15 @@ jQuery(document).ready(function($) {
                     z-index: 999999;
                     max-width: 400px;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                    animation: fscSlideIn 0.3s ease-out;
+                    animation: sbpSlideIn 0.3s ease-out;
                 }
                 
-                .fsc-notification-success { background: #00a32a; }
-                .fsc-notification-error { background: #d63638; }
-                .fsc-notification-warning { background: #f56e28; }
-                .fsc-notification-info { background: #0073aa; }
+                .sbp-notification-success { background: #00a32a; }
+                .sbp-notification-error { background: #d63638; }
+                .sbp-notification-warning { background: #f56e28; }
+                .sbp-notification-info { background: #0073aa; }
                 
-                .fsc-notification-close {
+                .sbp-notification-close {
                     background: none;
                     border: none;
                     color: white;
@@ -275,7 +275,7 @@ jQuery(document).ready(function($) {
                     padding: 0;
                 }
                 
-                @keyframes fscSlideIn {
+                @keyframes sbpSlideIn {
                     from { transform: translateX(100%); opacity: 0; }
                     to { transform: translateX(0); opacity: 1; }
                 }
@@ -285,7 +285,7 @@ jQuery(document).ready(function($) {
         
         $('body').append(notification);
         
-        notification.find('.fsc-notification-close').on('click', function() {
+        notification.find('.sbp-notification-close').on('click', function() {
             notification.fadeOut(300, function() { $(this).remove(); });
         });
         
@@ -300,18 +300,18 @@ jQuery(document).ready(function($) {
     setInterval(function() {
         if (!generationInProgress) {
             $.ajax({
-                url: fsc_ajax.ajax_url,
+                url: sbp_ajax.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'fsc_get_stats',
-                    nonce: fsc_ajax.nonce
+                    action: 'sbp_get_stats',
+                    nonce: sbp_ajax.nonce
                 },
                 success: function(response) {
                     if (response.success) {
                         // Actualizar estadísticas en tiempo real
                         const stats = response.data;
-                        $('.fsc-stat-number').eq(0).text(stats.files);
-                        $('.fsc-stat-number').eq(3).text(formatBytes(stats.size));
+                        $('.sbp-stat-number').eq(0).text(stats.files);
+                        $('.sbp-stat-number').eq(3).text(formatBytes(stats.size));
                     }
                 },
                 error: function() {
@@ -336,14 +336,14 @@ jQuery(document).ready(function($) {
 });
 
 // Función global para la barra de administración
-function fscClearCache() {
+function sbpClearCache() {
     if (confirm('¿Limpiar todos los archivos estáticos?')) {
         jQuery.ajax({
-            url: fsc_ajax.ajax_url,
+            url: sbp_ajax.ajax_url,
             type: 'POST',
             data: {
-                action: 'fsc_clear_cache',
-                nonce: fsc_ajax.nonce
+                action: 'sbp_clear_cache',
+                nonce: sbp_ajax.nonce
             },
             success: function(response) {
                 if (response.success) {
