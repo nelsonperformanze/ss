@@ -33,10 +33,11 @@ jQuery(document).ready(function($) {
                     showNotification('❌ Error: ' + response.data, 'error');
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
                 // Revertir checkbox si hay error
                 checkbox.prop('checked', !isEnabled);
-                showNotification('❌ Error de conexión', 'error');
+                showNotification('❌ Error de conexión: ' + error, 'error');
+                console.error('AJAX Error:', xhr.responseText);
             },
             complete: function() {
                 checkbox.prop('disabled', false);
@@ -56,7 +57,7 @@ jQuery(document).ready(function($) {
         const progressBar = progressContainer.find('.fsc-progress-fill');
         const statusText = $('#fsc-generation-status');
         
-        if (!confirm('¿Generar TODAS las páginas estáticas? Esto puede tomar varios minutos.')) {
+        if (!confirm('¿Generar TODAS las páginas estáticas? Esto puede tomar varios minutos y usar recursos del servidor.')) {
             return;
         }
         
@@ -67,12 +68,12 @@ jQuery(document).ready(function($) {
         // Simular progreso
         let progress = 0;
         const progressInterval = setInterval(() => {
-            progress += Math.random() * 3;
-            if (progress > 90) progress = 90;
+            progress += Math.random() * 2;
+            if (progress > 95) progress = 95;
             
             progressBar.css('width', progress + '%');
             statusText.text(`Generando páginas... ${Math.round(progress)}%`);
-        }, 1000);
+        }, 2000);
         
         $.ajax({
             url: fsc_ajax.ajax_url,
@@ -81,19 +82,23 @@ jQuery(document).ready(function($) {
                 action: 'fsc_generate_all_pages',
                 nonce: fsc_ajax.nonce
             },
-            timeout: 300000, // 5 minutos
+            timeout: 600000, // 10 minutos
             success: function(response) {
                 clearInterval(progressInterval);
                 progressBar.css('width', '100%');
                 
                 if (response.success) {
-                    statusText.text(`✅ ¡Completado! ${response.data.success} páginas generadas`);
-                    showNotification(`✅ Generación exitosa: ${response.data.success} páginas`, 'success');
+                    statusText.text(`✅ ¡Completado! ${response.data.success} páginas generadas de ${response.data.total} total`);
+                    showNotification(`✅ Generación exitosa: ${response.data.success}/${response.data.total} páginas`, 'success');
+                    
+                    if (response.data.errors > 0) {
+                        showNotification(`⚠️ ${response.data.errors} páginas tuvieron errores`, 'warning');
+                    }
                     
                     // Actualizar estadísticas
                     setTimeout(() => {
                         location.reload();
-                    }, 2000);
+                    }, 3000);
                 } else {
                     statusText.text('❌ Error en la generación');
                     showNotification('❌ Error: ' + response.data, 'error');
@@ -102,7 +107,8 @@ jQuery(document).ready(function($) {
             error: function(xhr, status, error) {
                 clearInterval(progressInterval);
                 statusText.text('❌ Error de conexión o timeout');
-                showNotification('❌ Error de conexión', 'error');
+                showNotification('❌ Error: ' + error, 'error');
+                console.error('AJAX Error:', xhr.responseText);
             },
             complete: function() {
                 generationInProgress = false;
@@ -110,7 +116,7 @@ jQuery(document).ready(function($) {
                 
                 setTimeout(() => {
                     progressContainer.hide();
-                }, 3000);
+                }, 5000);
             }
         });
     });
@@ -129,16 +135,51 @@ jQuery(document).ready(function($) {
                 action: 'fsc_preload_cache',
                 nonce: fsc_ajax.nonce
             },
+            timeout: 120000, // 2 minutos
             success: function(response) {
                 if (response.success) {
                     showNotification(`✅ Precarga completada: ${response.data.pages} páginas`, 'success');
-                    setTimeout(() => location.reload(), 1500);
+                    setTimeout(() => location.reload(), 2000);
                 } else {
                     showNotification('❌ Error: ' + response.data, 'error');
                 }
             },
-            error: function() {
-                showNotification('❌ Error de conexión', 'error');
+            error: function(xhr, status, error) {
+                showNotification('❌ Error de conexión: ' + error, 'error');
+                console.error('AJAX Error:', xhr.responseText);
+            },
+            complete: function() {
+                button.html(originalText).prop('disabled', false);
+            }
+        });
+    });
+    
+    // Optimizar assets
+    $('#fsc-optimize-assets').on('click', function() {
+        const button = $(this);
+        const originalText = button.html();
+        
+        button.html('<span class="fsc-btn-icon">⏳</span> Optimizando...').prop('disabled', true);
+        
+        $.ajax({
+            url: fsc_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'fsc_optimize_assets',
+                nonce: fsc_ajax.nonce
+            },
+            timeout: 180000, // 3 minutos
+            success: function(response) {
+                if (response.success) {
+                    showNotification('✅ ' + response.data.message, 'success');
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showNotification('❌ Error: ' + response.data, 'error');
+                }
+            },
+            error: function(xhr, status, error) {
+                showNotification('❌ Error de conexión: ' + error, 'error');
+                console.error('AJAX Error:', xhr.responseText);
             },
             complete: function() {
                 button.html(originalText).prop('disabled', false);
@@ -151,7 +192,7 @@ jQuery(document).ready(function($) {
         const button = $(this);
         const originalText = button.html();
         
-        if (!confirm('¿Limpiar todos los archivos estáticos?')) {
+        if (!confirm('¿Limpiar todos los archivos estáticos? Esta acción no se puede deshacer.')) {
             return;
         }
         
@@ -167,13 +208,14 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.success) {
                     showNotification('✅ Caché limpiado exitosamente', 'success');
-                    setTimeout(() => location.reload(), 1500);
+                    setTimeout(() => location.reload(), 2000);
                 } else {
                     showNotification('❌ Error: ' + response.data, 'error');
                 }
             },
-            error: function() {
-                showNotification('❌ Error de conexión', 'error');
+            error: function(xhr, status, error) {
+                showNotification('❌ Error de conexión: ' + error, 'error');
+                console.error('AJAX Error:', xhr.responseText);
             },
             complete: function() {
                 button.html(originalText).prop('disabled', false);
@@ -220,6 +262,7 @@ jQuery(document).ready(function($) {
                 
                 .fsc-notification-success { background: #00a32a; }
                 .fsc-notification-error { background: #d63638; }
+                .fsc-notification-warning { background: #f56e28; }
                 .fsc-notification-info { background: #0073aa; }
                 
                 .fsc-notification-close {
@@ -250,7 +293,45 @@ jQuery(document).ready(function($) {
             if (notification.is(':visible')) {
                 notification.fadeOut(300, function() { $(this).remove(); });
             }
-        }, 5000);
+        }, 7000);
+    }
+    
+    // Auto-refresh de estadísticas cada 30 segundos
+    setInterval(function() {
+        if (!generationInProgress) {
+            $.ajax({
+                url: fsc_ajax.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'fsc_get_stats',
+                    nonce: fsc_ajax.nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Actualizar estadísticas en tiempo real
+                        const stats = response.data;
+                        $('.fsc-stat-number').eq(0).text(stats.files);
+                        $('.fsc-stat-number').eq(3).text(formatBytes(stats.size));
+                    }
+                },
+                error: function() {
+                    // Silencioso - no mostrar errores para auto-refresh
+                }
+            });
+        }
+    }, 30000);
+    
+    // Función auxiliar para formatear bytes
+    function formatBytes(bytes, precision = 1) {
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let i = 0;
+        
+        while (bytes > 1024 && i < units.length - 1) {
+            bytes /= 1024;
+            i++;
+        }
+        
+        return Math.round(bytes * Math.pow(10, precision)) / Math.pow(10, precision) + ' ' + units[i];
     }
 });
 

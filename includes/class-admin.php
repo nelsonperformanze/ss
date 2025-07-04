@@ -1,6 +1,6 @@
 <?php
 /**
- * Clase para el panel de administración
+ * Clase para el panel de administración - Fast Static Cache Pro
  */
 class FSC_Admin {
     
@@ -16,12 +16,13 @@ class FSC_Admin {
         add_action('wp_ajax_fsc_clear_cache', array($this, 'ajax_clear_cache'));
         add_action('wp_ajax_fsc_get_stats', array($this, 'ajax_get_stats'));
         add_action('wp_ajax_fsc_preload_cache', array($this, 'ajax_preload_cache'));
+        add_action('wp_ajax_fsc_optimize_assets', array($this, 'ajax_optimize_assets'));
     }
     
     public function add_admin_menu() {
         add_options_page(
-            'Fast Static Cache',
-            'Fast Static Cache',
+            'Fast Static Cache Pro',
+            'Static Cache Pro',
             'manage_options',
             'fast-static-cache',
             array($this, 'admin_page')
@@ -34,25 +35,34 @@ class FSC_Admin {
         register_setting('fsc_settings', 'fsc_excluded_pages');
         register_setting('fsc_settings', 'fsc_excluded_user_agents');
         register_setting('fsc_settings', 'fsc_show_cache_info');
+        register_setting('fsc_settings', 'fsc_ml_enabled');
+        register_setting('fsc_settings', 'fsc_asset_optimization');
+        register_setting('fsc_settings', 'fsc_image_optimization');
+        register_setting('fsc_settings', 'fsc_critical_css');
     }
     
     public function admin_page() {
         $stats = fsc_get_cache_stats();
         $total_pages = fsc_get_total_pages_count();
         $enabled = get_option('fsc_enabled', true);
+        $ml_enabled = get_option('fsc_ml_enabled', true);
+        $asset_optimization = get_option('fsc_asset_optimization', true);
         $progress_percent = $total_pages['total'] > 0 ? round(($stats['files'] / $total_pages['total']) * 100, 1) : 0;
         ?>
         <div class="wrap">
-            <h1>Fast Static Cache</h1>
+            <h1>Fast Static Cache Pro</h1>
             
-            <!-- Control Principal Minimalista -->
+            <!-- Control Principal -->
             <div class="fsc-main-card">
                 <div class="fsc-header">
                     <div class="fsc-status">
-                        <h2>Sistema de Caché Estático</h2>
+                        <h2>Sistema de Caché Estático Inteligente</h2>
                         <p class="fsc-status-text <?php echo $enabled ? 'active' : 'inactive'; ?>">
                             <?php echo $enabled ? '● Activo' : '● Inactivo'; ?>
                         </p>
+                        <?php if ($ml_enabled): ?>
+                        <p class="fsc-ml-status">🧠 Optimización ML Activa</p>
+                        <?php endif; ?>
                     </div>
                     <div class="fsc-toggle">
                         <label class="fsc-switch">
@@ -62,7 +72,7 @@ class FSC_Admin {
                     </div>
                 </div>
                 
-                <!-- Estadísticas Compactas -->
+                <!-- Estadísticas -->
                 <div class="fsc-stats">
                     <div class="fsc-stat">
                         <span class="fsc-stat-number"><?php echo $stats['files']; ?></span>
@@ -93,7 +103,7 @@ class FSC_Admin {
             
             <!-- Acciones -->
             <div class="fsc-actions-card">
-                <h3>Acciones</h3>
+                <h3>Acciones Principales</h3>
                 <div class="fsc-actions">
                     <button type="button" id="fsc-generate-all" class="fsc-btn fsc-btn-primary">
                         <span class="fsc-btn-icon">🚀</span>
@@ -102,6 +112,10 @@ class FSC_Admin {
                     <button type="button" id="fsc-preload-cache" class="fsc-btn fsc-btn-secondary">
                         <span class="fsc-btn-icon">⚡</span>
                         Precarga Rápida
+                    </button>
+                    <button type="button" id="fsc-optimize-assets" class="fsc-btn fsc-btn-info">
+                        <span class="fsc-btn-icon">🎯</span>
+                        Optimizar Assets
                     </button>
                     <button type="button" id="fsc-clear-cache" class="fsc-btn fsc-btn-danger">
                         <span class="fsc-btn-icon">🗑️</span>
@@ -118,7 +132,7 @@ class FSC_Admin {
                 </div>
             </div>
             
-            <!-- Configuración Avanzada (Colapsable) -->
+            <!-- Configuración Avanzada -->
             <div class="fsc-config-card">
                 <h3 class="fsc-collapsible" data-target="fsc-config-content">
                     Configuración Avanzada <span class="fsc-arrow">▼</span>
@@ -129,6 +143,38 @@ class FSC_Admin {
                         
                         <table class="form-table">
                             <tr>
+                                <th scope="row">Optimización ML</th>
+                                <td>
+                                    <input type="checkbox" name="fsc_ml_enabled" value="1" <?php checked(get_option('fsc_ml_enabled', true)); ?> />
+                                    <label>Activar optimización inteligente con TensorFlow.js</label>
+                                    <p class="description">Usa Machine Learning para optimizar la carga de contenido basado en el comportamiento del usuario</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Optimización de Assets</th>
+                                <td>
+                                    <input type="checkbox" name="fsc_asset_optimization" value="1" <?php checked(get_option('fsc_asset_optimization', true)); ?> />
+                                    <label>Minificar y combinar CSS/JS automáticamente</label>
+                                    <p class="description">Combina y minifica archivos CSS y JavaScript para reducir requests HTTP</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Optimización de Imágenes</th>
+                                <td>
+                                    <input type="checkbox" name="fsc_image_optimization" value="1" <?php checked(get_option('fsc_image_optimization', true)); ?> />
+                                    <label>Generar formatos WebP y AVIF automáticamente</label>
+                                    <p class="description">Convierte imágenes a formatos modernos para mejor compresión</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">CSS Crítico</th>
+                                <td>
+                                    <input type="checkbox" name="fsc_critical_css" value="1" <?php checked(get_option('fsc_critical_css', true)); ?> />
+                                    <label>Generar CSS crítico inline automáticamente</label>
+                                    <p class="description">Inline del CSS crítico para eliminar render-blocking</p>
+                                </td>
+                            </tr>
+                            <tr>
                                 <th scope="row">Tiempo de Vida del Caché</th>
                                 <td>
                                     <input type="number" name="fsc_cache_lifetime" value="<?php echo get_option('fsc_cache_lifetime', 3600); ?>" min="60" step="60" />
@@ -138,8 +184,8 @@ class FSC_Admin {
                             <tr>
                                 <th scope="row">Páginas Excluidas</th>
                                 <td>
-                                    <textarea name="fsc_excluded_pages" rows="3" cols="50"><?php echo esc_textarea(implode("\n", (array)get_option('fsc_excluded_pages', array()))); ?></textarea>
-                                    <p class="description">Una URL por línea (ej: /carrito, /checkout)</p>
+                                    <textarea name="fsc_excluded_pages" rows="3" cols="50"><?php echo esc_textarea(implode("\n", (array)get_option('fsc_excluded_pages', array('/cart', '/checkout', '/my-account')))); ?></textarea>
+                                    <p class="description">Una URL por línea (ej: /carrito, /checkout). WooCommerce se excluye automáticamente.</p>
                                 </td>
                             </tr>
                             <tr>
@@ -162,10 +208,33 @@ class FSC_Admin {
                     </form>
                 </div>
             </div>
+            
+            <!-- Información del Sistema -->
+            <div class="fsc-info-card">
+                <h3>Estado del Sistema</h3>
+                <div class="fsc-system-info">
+                    <div class="fsc-info-item">
+                        <strong>WooCommerce:</strong> 
+                        <?php echo class_exists('WooCommerce') ? '✅ Detectado (compatibilidad activa)' : '❌ No detectado'; ?>
+                    </div>
+                    <div class="fsc-info-item">
+                        <strong>TensorFlow.js:</strong> 
+                        <?php echo $ml_enabled ? '✅ Habilitado' : '❌ Deshabilitado'; ?>
+                    </div>
+                    <div class="fsc-info-item">
+                        <strong>Optimización de Assets:</strong> 
+                        <?php echo $asset_optimization ? '✅ Activa' : '❌ Inactiva'; ?>
+                    </div>
+                    <div class="fsc-info-item">
+                        <strong>Última generación:</strong> 
+                        <?php echo $stats['last_generated'] ? $stats['last_generated'] : 'Nunca'; ?>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <style>
-        .fsc-main-card, .fsc-actions-card, .fsc-config-card {
+        .fsc-main-card, .fsc-actions-card, .fsc-config-card, .fsc-info-card {
             background: #fff;
             border: 1px solid #ddd;
             border-radius: 8px;
@@ -187,7 +256,7 @@ class FSC_Admin {
         }
         
         .fsc-status-text {
-            margin: 0;
+            margin: 0 0 5px 0;
             font-weight: 600;
             font-size: 14px;
         }
@@ -200,7 +269,14 @@ class FSC_Admin {
             color: #d63638;
         }
         
-        /* Switch Toggle Minimalista */
+        .fsc-ml-status {
+            margin: 0;
+            font-size: 12px;
+            color: #0073aa;
+            font-weight: 500;
+        }
+        
+        /* Switch Toggle */
         .fsc-switch {
             position: relative;
             display: inline-block;
@@ -246,7 +322,7 @@ class FSC_Admin {
             transform: translateX(26px);
         }
         
-        /* Estadísticas Compactas */
+        /* Estadísticas */
         .fsc-stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -301,7 +377,7 @@ class FSC_Admin {
             color: #666;
         }
         
-        /* Botones Minimalistas */
+        /* Botones */
         .fsc-actions {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -339,6 +415,15 @@ class FSC_Admin {
         
         .fsc-btn-secondary:hover {
             background: #ddd;
+        }
+        
+        .fsc-btn-info {
+            background: #00a32a;
+            color: white;
+        }
+        
+        .fsc-btn-info:hover {
+            background: #008a20;
         }
         
         .fsc-btn-danger {
@@ -393,6 +478,20 @@ class FSC_Admin {
             transition: all 0.3s;
         }
         
+        /* Sistema Info */
+        .fsc-system-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 10px;
+        }
+        
+        .fsc-info-item {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
         /* Responsive */
         @media (max-width: 768px) {
             .fsc-header {
@@ -406,6 +505,10 @@ class FSC_Admin {
             }
             
             .fsc-actions {
+                grid-template-columns: 1fr;
+            }
+            
+            .fsc-system-info {
                 grid-template-columns: 1fr;
             }
         }
@@ -482,18 +585,22 @@ class FSC_Admin {
             wp_send_json_error('Permisos insuficientes');
         }
         
-        // Aumentar límites
+        // Aumentar límites para procesamiento masivo
         set_time_limit(0);
-        ini_set('memory_limit', '512M');
+        ini_set('memory_limit', '1024M');
         
-        $result = fsc_generate_all_static_pages();
-        
-        wp_send_json_success(array(
-            'message' => 'Generación completada',
-            'total' => $result['total'],
-            'success' => $result['success'],
-            'errors' => $result['errors']
-        ));
+        try {
+            $result = fsc_generate_all_static_pages();
+            
+            wp_send_json_success(array(
+                'message' => 'Generación completada exitosamente',
+                'total' => $result['total'],
+                'success' => $result['success'],
+                'errors' => $result['errors']
+            ));
+        } catch (Exception $e) {
+            wp_send_json_error('Error durante la generación: ' . $e->getMessage());
+        }
     }
     
     public function ajax_clear_cache() {
@@ -530,11 +637,34 @@ class FSC_Admin {
             wp_send_json_error('Permisos insuficientes');
         }
         
-        $preloaded = fsc_preload_cache();
+        try {
+            $preloaded = fsc_preload_cache();
+            
+            wp_send_json_success(array(
+                'message' => 'Precarga completada exitosamente',
+                'pages' => $preloaded
+            ));
+        } catch (Exception $e) {
+            wp_send_json_error('Error durante la precarga: ' . $e->getMessage());
+        }
+    }
+    
+    public function ajax_optimize_assets() {
+        check_ajax_referer('fsc_nonce', 'nonce');
         
-        wp_send_json_success(array(
-            'message' => 'Precarga completada',
-            'pages' => $preloaded
-        ));
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Permisos insuficientes');
+        }
+        
+        try {
+            // Ejecutar optimización de assets
+            fsc_run_asset_optimization();
+            
+            wp_send_json_success(array(
+                'message' => 'Optimización de assets completada'
+            ));
+        } catch (Exception $e) {
+            wp_send_json_error('Error durante la optimización: ' . $e->getMessage());
+        }
     }
 }

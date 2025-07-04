@@ -1,6 +1,6 @@
 <?php
 /**
- * Clase principal del plugin Fast Static Cache
+ * Clase principal del plugin Fast Static Cache Pro
  */
 class Fast_Static_Cache {
     
@@ -19,6 +19,9 @@ class Fast_Static_Cache {
         
         // Información de caché
         add_action('wp_footer', array($this, 'add_cache_info'), 999);
+        
+        // Filtros para optimización
+        add_filter('fsc_should_cache_page', array($this, 'should_cache_current_page'), 10, 2);
     }
     
     public function init() {
@@ -29,12 +32,7 @@ class Fast_Static_Cache {
      * Servir archivo estático si existe
      */
     public function serve_static_if_exists() {
-        if (!get_option('fsc_enabled', true) || 
-            is_user_logged_in() || 
-            is_admin() || 
-            !empty($_GET) || 
-            $_SERVER['REQUEST_METHOD'] !== 'GET' ||
-            $this->is_page_excluded()) {
+        if (!$this->should_serve_static()) {
             return;
         }
         
@@ -46,17 +44,73 @@ class Fast_Static_Cache {
         }
     }
     
+    /**
+     * Verificar si debe servir archivo estático
+     */
+    private function should_serve_static() {
+        // No servir si está deshabilitado
+        if (!get_option('fsc_enabled', true)) {
+            return false;
+        }
+        
+        // No servir para usuarios logueados
+        if (is_user_logged_in()) {
+            return false;
+        }
+        
+        // No servir en admin
+        if (is_admin()) {
+            return false;
+        }
+        
+        // Solo GET requests
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            return false;
+        }
+        
+        // No servir si hay parámetros GET
+        if (!empty($_GET)) {
+            return false;
+        }
+        
+        // Verificar exclusiones
+        if ($this->is_page_excluded()) {
+            return false;
+        }
+        
+        // Verificar compatibilidad WooCommerce
+        if (class_exists('WooCommerce')) {
+            if (is_cart() || is_checkout() || is_account_page() || is_product()) {
+                return false;
+            }
+            
+            // Verificar cookies de WooCommerce
+            if (isset($_COOKIE['woocommerce_cart_hash']) || 
+                isset($_COOKIE['woocommerce_items_in_cart'])) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
     private function serve_static_file($static_file) {
+        // Headers optimizados para máximo rendimiento
         header('Content-Type: text/html; charset=UTF-8');
         header('X-Static-Cache: HIT');
+        header('X-Cache-Status: STATIC');
         header('Cache-Control: public, max-age=3600');
+        header('Vary: Accept-Encoding');
         
+        // Servir versión comprimida si el cliente la acepta
         $compressed_file = $static_file . '.gz';
         
         if (file_exists($compressed_file) && $this->client_accepts_gzip()) {
             header('Content-Encoding: gzip');
+            header('Content-Length: ' . filesize($compressed_file));
             readfile($compressed_file);
         } else {
+            header('Content-Length: ' . filesize($static_file));
             readfile($static_file);
         }
         
@@ -64,12 +118,7 @@ class Fast_Static_Cache {
     }
     
     public function start_buffering() {
-        if (!get_option('fsc_enabled', true) || 
-            is_user_logged_in() || 
-            is_admin() || 
-            !empty($_GET) || 
-            $_SERVER['REQUEST_METHOD'] !== 'GET' ||
-            $this->is_page_excluded()) {
+        if (!$this->should_generate_static()) {
             return;
         }
         
@@ -83,10 +132,74 @@ class Fast_Static_Cache {
     }
     
     /**
+     * Verificar si debe generar archivo estático
+     */
+    private function should_generate_static() {
+        // Aplicar filtro personalizable
+        $should_cache = apply_filters('fsc_should_cache_page', true, $_SERVER['REQUEST_URI']);
+        
+        if (!$should_cache) {
+            return false;
+        }
+        
+        return $this->should_serve_static();
+    }
+    
+    /**
+     * Filtro para verificar si la página actual debe ser cacheada
+     */
+    public function should_cache_current_page($should_cache, $url) {
+        // No cachear páginas especiales
+        if (is_404() || is_feed() || is_robots() || is_trackback()) {
+            return false;
+        }
+        
+        // No cachear búsquedas
+        if (is_search()) {
+            return false;
+        }
+        
+        // No cachear páginas con formularios
+        if (is_page() && $this->page_has_forms()) {
+            return false;
+        }
+        
+        return $should_cache;
+    }
+    
+    /**
+     * Verificar si la página tiene formularios
+     */
+    private function page_has_forms() {
+        global $post;
+        
+        if (!$post) {
+            return false;
+        }
+        
+        // Buscar formularios comunes en el contenido
+        $form_patterns = array(
+            '<form',
+            'contact-form',
+            'wpcf7-form',
+            'gform_wrapper',
+            'ninja-forms'
+        );
+        
+        foreach ($form_patterns as $pattern) {
+            if (strpos($post->post_content, $pattern) !== false) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
      * Generar archivo estático
      */
     public function generate_static_file($buffer) {
-        if (!$this->should_generate_static()) {
+        if (!$this->should_generate_static_from_buffer($buffer)) {
             return $buffer;
         }
         
@@ -97,31 +210,79 @@ class Fast_Static_Cache {
             wp_mkdir_p($static_dir);
         }
         
+        // Optimizar HTML antes de guardar
         $optimized_html = $this->optimize_html_for_static($buffer);
         
+        // Aplicar filtro para optimizaciones adicionales
+        $optimized_html = apply_filters('fsc_static_html', $optimized_html, $_SERVER['REQUEST_URI']);
+        
+        // Añadir información de caché si está habilitado
         if (get_option('fsc_show_cache_info', true)) {
             $cache_info = sprintf(
-                "\n<!-- Fast Static Cache: Generado el %s -->",
+                "\n<!-- Fast Static Cache Pro: Generado el %s -->",
                 date('Y-m-d H:i:s')
             );
             $optimized_html .= $cache_info;
         }
         
-        file_put_contents($static_file, $optimized_html, LOCK_EX);
+        // Guardar archivo estático
+        $result = file_put_contents($static_file, $optimized_html, LOCK_EX);
         
-        if (function_exists('gzencode')) {
-            file_put_contents($static_file . '.gz', gzencode($optimized_html, 9), LOCK_EX);
+        if ($result) {
+            // Crear versión comprimida
+            if (function_exists('gzencode')) {
+                file_put_contents($static_file . '.gz', gzencode($optimized_html, 9), LOCK_EX);
+            }
         }
         
         return $buffer;
     }
     
+    /**
+     * Verificar si debe generar estático desde buffer
+     */
+    private function should_generate_static_from_buffer($buffer) {
+        // No generar si el buffer está vacío
+        if (empty(trim($buffer))) {
+            return false;
+        }
+        
+        // No generar si no es HTML válido
+        if (strpos($buffer, '<html') === false && strpos($buffer, '<!DOCTYPE') === false) {
+            return false;
+        }
+        
+        // No generar si hay errores PHP
+        if (strpos($buffer, 'Fatal error') !== false || 
+            strpos($buffer, 'Parse error') !== false) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Optimizar HTML para archivo estático
+     */
     private function optimize_html_for_static($html) {
         $site_url = get_site_url();
         
-        // Convertir URLs relativas a absolutas
+        // Convertir URLs relativas a absolutas para mejor compatibilidad
         $html = preg_replace('/href="\/([^"]*)"/', 'href="' . $site_url . '/$1"', $html);
         $html = preg_replace('/src="\/([^"]*)"/', 'src="' . $site_url . '/$1"', $html);
+        
+        // Optimizar espacios en blanco (conservando legibilidad)
+        $html = preg_replace('/\s+/', ' ', $html);
+        $html = preg_replace('/>\s+</', '><', $html);
+        
+        // Añadir meta tags para mejor rendimiento
+        $performance_meta = '
+        <meta name="generator" content="Fast Static Cache Pro">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        ';
+        
+        $html = str_replace('</head>', $performance_meta . '</head>', $html);
         
         return $html;
     }
@@ -153,10 +314,6 @@ class Fast_Static_Cache {
                strpos($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip') !== false;
     }
     
-    private function should_generate_static() {
-        return !is_404() && !is_feed() && !is_robots() && !is_trackback();
-    }
-    
     private function is_page_excluded() {
         $excluded_pages = get_option('fsc_excluded_pages', array());
         if (is_string($excluded_pages)) {
@@ -172,6 +329,7 @@ class Fast_Static_Cache {
             }
         }
         
+        // Verificar user agents excluidos
         $excluded_user_agents = get_option('fsc_excluded_user_agents', array('bot', 'crawler', 'spider'));
         if (is_string($excluded_user_agents)) {
             $excluded_user_agents = explode("\n", $excluded_user_agents);
@@ -195,7 +353,28 @@ class Fast_Static_Cache {
             $this->clear_static_file_by_url($post_url);
         }
         
+        // También limpiar página principal
         $this->clear_static_file_by_url(home_url());
+        
+        // Limpiar páginas relacionadas si es un post
+        if ($post_id) {
+            $post = get_post($post_id);
+            if ($post && $post->post_type === 'post') {
+                // Limpiar archivo de categorías
+                $categories = get_the_category($post_id);
+                foreach ($categories as $category) {
+                    $this->clear_static_file_by_url(get_category_link($category->term_id));
+                }
+                
+                // Limpiar archivo de tags
+                $tags = get_the_tags($post_id);
+                if ($tags) {
+                    foreach ($tags as $tag) {
+                        $this->clear_static_file_by_url(get_tag_link($tag->term_id));
+                    }
+                }
+            }
+        }
     }
     
     public function regenerate_page_static($post_id = null) {
@@ -233,7 +412,8 @@ class Fast_Static_Cache {
         $static_file = $this->get_static_file_path();
         $is_static = file_exists($static_file);
         
-        echo "\n<!-- Fast Static Cache: " . ($is_static ? 'STATIC' : 'GENERATED') . " -->";
-        echo "\n<!-- Generated: " . date('Y-m-d H:i:s') . " -->\n";
+        echo "\n<!-- Fast Static Cache Pro: " . ($is_static ? 'STATIC' : 'GENERATED') . " -->";
+        echo "\n<!-- Generated: " . date('Y-m-d H:i:s') . " -->";
+        echo "\n<!-- ML Optimization: " . (get_option('fsc_ml_enabled', true) ? 'ENABLED' : 'DISABLED') . " -->\n";
     }
 }
