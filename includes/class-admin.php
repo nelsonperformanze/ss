@@ -17,6 +17,7 @@ class SBP_Admin {
         add_action('wp_ajax_sbp_get_stats', array($this, 'ajax_get_stats'));
         add_action('wp_ajax_sbp_preload_cache', array($this, 'ajax_preload_cache'));
         add_action('wp_ajax_sbp_optimize_assets', array($this, 'ajax_optimize_assets'));
+        add_action('wp_ajax_sbp_get_pagespeed_score', array($this, 'ajax_get_pagespeed_score'));
     }
     
     public function add_admin_menu() {
@@ -45,6 +46,7 @@ class SBP_Admin {
         register_setting('sbp_settings', 'sbp_eliminate_render_blocking');
         register_setting('sbp_settings', 'sbp_optimize_lcp');
         register_setting('sbp_settings', 'sbp_minimize_main_thread');
+        register_setting('sbp_settings', 'sbp_pagespeed_monitoring');
     }
     
     public function admin_page() {
@@ -55,7 +57,11 @@ class SBP_Admin {
         $asset_optimization = get_option('sbp_asset_optimization', true);
         $aggressive_optimization = get_option('sbp_aggressive_optimization', false);
         $pagespeed_mode = get_option('sbp_pagespeed_mode', true);
+        $pagespeed_monitoring = get_option('sbp_pagespeed_monitoring', false);
         $progress_percent = $total_pages['total'] > 0 ? round(($stats['files'] / $total_pages['total']) * 100, 1) : 0;
+        
+        // Obtener puntuación de PageSpeed si está habilitado el monitoreo
+        $pagespeed_score = $pagespeed_monitoring ? get_transient('sbp_pagespeed_score') : false;
         ?>
         <div class="wrap">
             <div class="sbp-header">
@@ -76,6 +82,9 @@ class SBP_Admin {
                         <?php endif; ?>
                         <?php if ($pagespeed_mode): ?>
                         <p class="sbp-pagespeed-status">🚀 Modo PageSpeed 100/100</p>
+                        <?php endif; ?>
+                        <?php if ($pagespeed_score): ?>
+                        <p class="sbp-pagespeed-score">📊 PageSpeed: <span class="score-<?php echo $this->get_score_class($pagespeed_score['performance']); ?>"><?php echo $pagespeed_score['performance']; ?>/100</span></p>
                         <?php endif; ?>
                     </div>
                     <div class="sbp-toggle">
@@ -129,7 +138,7 @@ class SBP_Admin {
                     </button>
                     <button type="button" id="sbp-optimize-assets" class="sbp-btn sbp-btn-info">
                         <span class="sbp-btn-icon">🎯</span>
-                        Optimizar PageSpeed
+                        Optimizar Assets
                     </button>
                     <button type="button" id="sbp-clear-cache" class="sbp-btn sbp-btn-danger">
                         <span class="sbp-btn-icon">🗑️</span>
@@ -162,6 +171,14 @@ class SBP_Admin {
                                     <input type="checkbox" name="sbp_pagespeed_mode" value="1" <?php checked(get_option('sbp_pagespeed_mode', true)); ?> />
                                     <label><strong>Activar optimizaciones para PageSpeed Insights</strong></label>
                                     <p class="description">Optimizaciones específicas para obtener 100/100 en PageSpeed: CSS crítico inline, preload headers, eliminación de render-blocking</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">📊 Monitoreo PageSpeed</th>
+                                <td>
+                                    <input type="checkbox" name="sbp_pagespeed_monitoring" value="1" <?php checked(get_option('sbp_pagespeed_monitoring', false)); ?> />
+                                    <label>Obtener puntuación real de PageSpeed Insights cada 6 horas</label>
+                                    <p class="description">Consulta automática a la API de Google PageSpeed Insights para mostrar puntuación real</p>
                                 </td>
                             </tr>
                             <tr>
@@ -272,6 +289,13 @@ class SBP_Admin {
                         <strong>Última conversión:</strong> 
                         <?php echo $stats['last_generated'] ? $stats['last_generated'] : 'Nunca'; ?>
                     </div>
+                    <?php if ($pagespeed_score): ?>
+                    <div class="sbp-info-item">
+                        <strong>PageSpeed Insights:</strong> 
+                        Performance: <span class="score-<?php echo $this->get_score_class($pagespeed_score['performance']); ?>"><?php echo $pagespeed_score['performance']; ?></span> | 
+                        Última actualización: <?php echo date('d/m/Y H:i', $pagespeed_score['timestamp']); ?>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 
                 <?php if ($aggressive_optimization): ?>
@@ -338,12 +362,16 @@ class SBP_Admin {
             color: #d63638;
         }
         
-        .sbp-ai-status, .sbp-pagespeed-status {
+        .sbp-ai-status, .sbp-pagespeed-status, .sbp-pagespeed-score {
             margin: 0;
             font-size: 13px;
             color: #0073aa;
             font-weight: 500;
         }
+        
+        .score-good { color: #00a32a; font-weight: bold; }
+        .score-average { color: #f56e28; font-weight: bold; }
+        .score-poor { color: #d63638; font-weight: bold; }
         
         /* Switch Toggle - Más pequeño */
         .sbp-switch {
@@ -619,6 +647,12 @@ class SBP_Admin {
         return round($bytes, $precision) . ' ' . $units[$i];
     }
     
+    private function get_score_class($score) {
+        if ($score >= 90) return 'good';
+        if ($score >= 50) return 'average';
+        return 'poor';
+    }
+    
     public function enqueue_scripts($hook) {
         if ($hook !== 'settings_page_staticboost-pro') {
             return;
@@ -652,7 +686,7 @@ class SBP_Admin {
         ));
     }
     
-    // AJAX Handlers (actualizados con nuevos nombres)
+    // AJAX Handlers
     public function ajax_toggle_cache() {
         check_ajax_referer('sbp_nonce', 'nonce');
         
@@ -760,10 +794,67 @@ class SBP_Admin {
             $pagespeed = get_option('sbp_pagespeed_mode', true) ? ' + PageSpeed 100/100' : '';
             
             wp_send_json_success(array(
-                'message' => "Optimización completada (modo {$mode}{$pagespeed})"
+                'message' => "Optimización de assets completada (modo {$mode}{$pagespeed})"
             ));
         } catch (Exception $e) {
             wp_send_json_error('Error durante la optimización: ' . $e->getMessage());
         }
+    }
+    
+    public function ajax_get_pagespeed_score() {
+        check_ajax_referer('sbp_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Permisos insuficientes');
+        }
+        
+        try {
+            $score = $this->fetch_pagespeed_score();
+            
+            if ($score) {
+                // Guardar en transient por 6 horas
+                set_transient('sbp_pagespeed_score', $score, 6 * HOUR_IN_SECONDS);
+                wp_send_json_success($score);
+            } else {
+                wp_send_json_error('No se pudo obtener la puntuación de PageSpeed');
+            }
+        } catch (Exception $e) {
+            wp_send_json_error('Error al consultar PageSpeed: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Obtener puntuación real de PageSpeed Insights
+     */
+    private function fetch_pagespeed_score() {
+        $url = home_url();
+        $api_key = 'AIzaSyBGRY8_x14VMmMEc_XiaFbMTLdCBNgFqv8'; // API key pública de ejemplo
+        $api_url = "https://www.googleapis.com/pagespeed/v5/runPagespeed?url=" . urlencode($url) . "&key=" . $api_key . "&category=performance";
+        
+        $response = wp_remote_get($api_url, array(
+            'timeout' => 30,
+            'headers' => array(
+                'User-Agent' => 'StaticBoost Pro PageSpeed Monitor'
+            )
+        ));
+        
+        if (is_wp_error($response)) {
+            return false;
+        }
+        
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        if (isset($data['lighthouseResult']['categories']['performance']['score'])) {
+            $performance_score = round($data['lighthouseResult']['categories']['performance']['score'] * 100);
+            
+            return array(
+                'performance' => $performance_score,
+                'timestamp' => time(),
+                'url' => $url
+            );
+        }
+        
+        return false;
     }
 }

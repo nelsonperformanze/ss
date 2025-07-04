@@ -515,3 +515,67 @@ function sbp_regenerate_with_new_config() {
     // Regenerar páginas principales con nueva configuración
     sbp_preload_cache();
 }
+
+/**
+ * Programar obtención de PageSpeed Score
+ */
+add_action('init', 'sbp_schedule_pagespeed_monitoring');
+function sbp_schedule_pagespeed_monitoring() {
+    if (get_option('sbp_pagespeed_monitoring', false)) {
+        if (!wp_next_scheduled('sbp_fetch_pagespeed_score')) {
+            wp_schedule_event(time(), 'sbp_six_hourly', 'sbp_fetch_pagespeed_score');
+        }
+    } else {
+        wp_clear_scheduled_hook('sbp_fetch_pagespeed_score');
+    }
+}
+
+/**
+ * Añadir intervalo personalizado de 6 horas
+ */
+add_filter('cron_schedules', 'sbp_add_cron_intervals');
+function sbp_add_cron_intervals($schedules) {
+    $schedules['sbp_six_hourly'] = array(
+        'interval' => 6 * HOUR_IN_SECONDS,
+        'display' => 'Cada 6 horas'
+    );
+    return $schedules;
+}
+
+/**
+ * Obtener puntuación de PageSpeed automáticamente
+ */
+add_action('sbp_fetch_pagespeed_score', 'sbp_auto_fetch_pagespeed_score');
+function sbp_auto_fetch_pagespeed_score() {
+    if (!get_option('sbp_pagespeed_monitoring', false)) {
+        return;
+    }
+    
+    $url = home_url();
+    $api_url = "https://www.googleapis.com/pagespeed/v5/runPagespeed?url=" . urlencode($url) . "&category=performance";
+    
+    $response = wp_remote_get($api_url, array(
+        'timeout' => 30,
+        'headers' => array(
+            'User-Agent' => 'StaticBoost Pro PageSpeed Monitor'
+        )
+    ));
+    
+    if (!is_wp_error($response)) {
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        if (isset($data['lighthouseResult']['categories']['performance']['score'])) {
+            $performance_score = round($data['lighthouseResult']['categories']['performance']['score'] * 100);
+            
+            $score_data = array(
+                'performance' => $performance_score,
+                'timestamp' => time(),
+                'url' => $url
+            );
+            
+            // Guardar en transient por 6 horas
+            set_transient('sbp_pagespeed_score', $score_data, 6 * HOUR_IN_SECONDS);
+        }
+    }
+}
