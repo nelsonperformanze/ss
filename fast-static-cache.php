@@ -33,6 +33,7 @@ require_once SBP_PLUGIN_PATH . 'includes/class-woocommerce-compat.php';
 require_once SBP_PLUGIN_PATH . 'includes/class-boostai-optimizer.php';
 require_once SBP_PLUGIN_PATH . 'includes/class-pagespeed-optimizer.php';
 require_once SBP_PLUGIN_PATH . 'includes/class-asset-optimizer.php';
+require_once SBP_PLUGIN_PATH . 'includes/class-visual-builder-compat.php';
 require_once SBP_PLUGIN_PATH . 'includes/functions.php';
 
 // Inicializar el plugin
@@ -56,8 +57,19 @@ function sbp_init() {
     
     // Asset Optimizer
     new SBP_Asset_Optimizer();
+    
+    // Visual Builder Compatibility
+    new SBP_Visual_Builder_Compat();
 }
 add_action('plugins_loaded', 'sbp_init');
+
+// Enlaces de acción en la página de plugins
+add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'sbp_add_action_links');
+function sbp_add_action_links($links) {
+    $settings_link = '<a href="' . admin_url('options-general.php?page=staticboost-pro') . '">Configuración</a>';
+    array_unshift($links, $settings_link);
+    return $links;
+}
 
 // Activación del plugin
 register_activation_hook(__FILE__, 'sbp_activate');
@@ -95,7 +107,7 @@ function sbp_activate() {
     add_option('sbp_aggressive_optimization', false);
     add_option('sbp_image_optimization', true);
     add_option('sbp_critical_css', true);
-    add_option('sbp_pagespeed_mode', true); // NUEVO: Modo PageSpeed
+    add_option('sbp_pagespeed_mode', true);
     add_option('sbp_preload_critical_resources', true);
     add_option('sbp_eliminate_render_blocking', true);
     add_option('sbp_optimize_lcp', true);
@@ -113,6 +125,9 @@ function sbp_activate() {
     if (!wp_next_scheduled('sbp_pagespeed_optimization')) {
         wp_schedule_event(time(), 'twicedaily', 'sbp_pagespeed_optimization');
     }
+    
+    // Flush rewrite rules
+    flush_rewrite_rules();
 }
 
 // Desactivación del plugin
@@ -131,6 +146,12 @@ function sbp_deactivate() {
     if (file_exists($htaccess_path)) {
         unlink($htaccess_path);
     }
+    
+    // Limpiar reglas de rewrite del .htaccess principal
+    sbp_clean_main_htaccess();
+    
+    // Flush rewrite rules
+    flush_rewrite_rules();
 }
 
 // Crear tablas para analytics BoostAI
@@ -323,6 +344,21 @@ RewriteRule ^(.*)$ wp-content/cache/staticboost-pro/$1/index.html [L]
 ';
         
         file_put_contents($root_htaccess, $static_rules . $existing_content);
+    }
+}
+
+// Limpiar .htaccess principal al desactivar
+function sbp_clean_main_htaccess() {
+    $root_htaccess = ABSPATH . '.htaccess';
+    
+    if (file_exists($root_htaccess)) {
+        $content = file_get_contents($root_htaccess);
+        
+        // Eliminar reglas de StaticBoost Pro
+        $pattern = '/# StaticBoost Pro.*?# Fin StaticBoost Pro\s*/s';
+        $content = preg_replace($pattern, '', $content);
+        
+        file_put_contents($root_htaccess, $content);
     }
 }
 

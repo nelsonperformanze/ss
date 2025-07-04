@@ -1,8 +1,8 @@
 <?php
 /**
- * Clase principal del plugin Fast Static Cache Pro
+ * Clase principal de StaticBoost Pro
  */
-class Fast_Static_Cache {
+class StaticBoost_Core {
     
     public function __construct() {
         add_action('init', array($this, 'init'));
@@ -14,6 +14,12 @@ class Fast_Static_Cache {
         add_action('comment_post', array($this, 'regenerate_page_static'));
         add_action('wp_set_comment_status', array($this, 'regenerate_page_static'));
         
+        // Hooks para constructores visuales
+        add_action('elementor/editor/after_save', array($this, 'regenerate_static_files'));
+        add_action('fl_builder_after_save_layout', array($this, 'regenerate_static_files'));
+        add_action('vc_after_save', array($this, 'regenerate_static_files'));
+        add_action('fusion_builder_after_save', array($this, 'regenerate_static_files'));
+        
         // Servir estático antes de WordPress
         add_action('template_redirect', array($this, 'serve_static_if_exists'), 1);
         
@@ -21,11 +27,11 @@ class Fast_Static_Cache {
         add_action('wp_footer', array($this, 'add_cache_info'), 999);
         
         // Filtros para optimización
-        add_filter('fsc_should_cache_page', array($this, 'should_cache_current_page'), 10, 2);
+        add_filter('sbp_should_cache_page', array($this, 'should_cache_current_page'), 10, 2);
     }
     
     public function init() {
-        load_plugin_textdomain('fast-static-cache', false, dirname(plugin_basename(__FILE__)) . '/languages/');
+        load_plugin_textdomain('staticboost-pro', false, dirname(plugin_basename(__FILE__)) . '/languages/');
     }
     
     /**
@@ -49,7 +55,7 @@ class Fast_Static_Cache {
      */
     private function should_serve_static() {
         // No servir si está deshabilitado
-        if (!get_option('fsc_enabled', true)) {
+        if (!get_option('sbp_enabled', true)) {
             return false;
         }
         
@@ -95,12 +101,17 @@ class Fast_Static_Cache {
     }
     
     private function serve_static_file($static_file) {
-        // Headers optimizados para máximo rendimiento
+        // Headers optimizados para máximo rendimiento y PageSpeed
         header('Content-Type: text/html; charset=UTF-8');
         header('X-Static-Cache: HIT');
         header('X-Cache-Status: STATIC');
         header('Cache-Control: public, max-age=3600');
         header('Vary: Accept-Encoding');
+        
+        // Headers adicionales para PageSpeed
+        header('X-Content-Type-Options: nosniff');
+        header('X-Frame-Options: DENY');
+        header('Referrer-Policy: strict-origin-when-cross-origin');
         
         // Servir versión comprimida si el cliente la acepta
         $compressed_file = $static_file . '.gz';
@@ -136,7 +147,7 @@ class Fast_Static_Cache {
      */
     private function should_generate_static() {
         // Aplicar filtro personalizable
-        $should_cache = apply_filters('fsc_should_cache_page', true, $_SERVER['REQUEST_URI']);
+        $should_cache = apply_filters('sbp_should_cache_page', true, $_SERVER['REQUEST_URI']);
         
         if (!$should_cache) {
             return false;
@@ -214,12 +225,12 @@ class Fast_Static_Cache {
         $optimized_html = $this->optimize_html_for_static($buffer);
         
         // Aplicar filtro para optimizaciones adicionales
-        $optimized_html = apply_filters('fsc_static_html', $optimized_html, $_SERVER['REQUEST_URI']);
+        $optimized_html = apply_filters('sbp_static_html', $optimized_html, $_SERVER['REQUEST_URI']);
         
         // Añadir información de caché si está habilitado
-        if (get_option('fsc_show_cache_info', true)) {
+        if (get_option('sbp_show_cache_info', true)) {
             $cache_info = sprintf(
-                "\n<!-- Fast Static Cache Pro: Generado el %s -->",
+                "\n<!-- StaticBoost Pro: Generado el %s -->",
                 date('Y-m-d H:i:s')
             );
             $optimized_html .= $cache_info;
@@ -275,11 +286,13 @@ class Fast_Static_Cache {
         $html = preg_replace('/\s+/', ' ', $html);
         $html = preg_replace('/>\s+</', '><', $html);
         
-        // Añadir meta tags para mejor rendimiento
+        // Añadir meta tags para mejor rendimiento y PageSpeed
         $performance_meta = '
-        <meta name="generator" content="Fast Static Cache Pro">
+        <meta name="generator" content="StaticBoost Pro">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+        <meta name="format-detection" content="telephone=no">
         ';
         
         $html = str_replace('</head>', $performance_meta . '</head>', $html);
@@ -295,7 +308,7 @@ class Fast_Static_Cache {
             $request_uri = '/index';
         }
         
-        return FSC_CACHE_DIR . ltrim($request_uri, '/') . '/index.html';
+        return SBP_CACHE_DIR . ltrim($request_uri, '/') . '/index.html';
     }
     
     private function is_static_file_valid($static_file) {
@@ -303,7 +316,7 @@ class Fast_Static_Cache {
             return false;
         }
         
-        $cache_lifetime = get_option('fsc_cache_lifetime', 3600);
+        $cache_lifetime = get_option('sbp_cache_lifetime', 3600);
         $file_time = filemtime($static_file);
         
         return (time() - $file_time) < $cache_lifetime;
@@ -315,7 +328,7 @@ class Fast_Static_Cache {
     }
     
     private function is_page_excluded() {
-        $excluded_pages = get_option('fsc_excluded_pages', array());
+        $excluded_pages = get_option('sbp_excluded_pages', array());
         if (is_string($excluded_pages)) {
             $excluded_pages = explode("\n", $excluded_pages);
         }
@@ -330,7 +343,7 @@ class Fast_Static_Cache {
         }
         
         // Verificar user agents excluidos
-        $excluded_user_agents = get_option('fsc_excluded_user_agents', array('bot', 'crawler', 'spider'));
+        $excluded_user_agents = get_option('sbp_excluded_user_agents', array('bot', 'crawler', 'spider'));
         if (is_string($excluded_user_agents)) {
             $excluded_user_agents = explode("\n", $excluded_user_agents);
         }
@@ -393,7 +406,7 @@ class Fast_Static_Cache {
             $path = '/index';
         }
         
-        $static_file = FSC_CACHE_DIR . ltrim($path, '/') . '/index.html';
+        $static_file = SBP_CACHE_DIR . ltrim($path, '/') . '/index.html';
         
         if (file_exists($static_file)) {
             unlink($static_file);
@@ -405,15 +418,15 @@ class Fast_Static_Cache {
     }
     
     public function add_cache_info() {
-        if (!get_option('fsc_show_cache_info', true) || is_admin() || is_user_logged_in()) {
+        if (!get_option('sbp_show_cache_info', true) || is_admin() || is_user_logged_in()) {
             return;
         }
         
         $static_file = $this->get_static_file_path();
         $is_static = file_exists($static_file);
         
-        echo "\n<!-- Fast Static Cache Pro: " . ($is_static ? 'STATIC' : 'GENERATED') . " -->";
+        echo "\n<!-- StaticBoost Pro: " . ($is_static ? 'STATIC' : 'GENERATED') . " -->";
         echo "\n<!-- Generated: " . date('Y-m-d H:i:s') . " -->";
-        echo "\n<!-- ML Optimization: " . (get_option('fsc_ml_enabled', true) ? 'ENABLED' : 'DISABLED') . " -->\n";
+        echo "\n<!-- BoostAI Optimization: " . (get_option('sbp_boostai_enabled', true) ? 'ENABLED' : 'DISABLED') . " -->\n";
     }
 }

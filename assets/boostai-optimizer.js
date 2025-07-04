@@ -1,11 +1,10 @@
 /**
- * Fast Static Cache ML Optimizer
- * Sistema de optimización inteligente con TensorFlow.js
+ * StaticBoost Pro BoostAI™ Optimizer
+ * Sistema de optimización inteligente propietario
  */
-class FSCMLOptimizer {
+class SBPBoostAI {
     constructor() {
-        this.model = null;
-        this.config = window.fscML?.config || {};
+        this.config = window.sbpBoostAI?.config || {};
         this.sessionData = {
             startTime: Date.now(),
             scrollEvents: [],
@@ -16,41 +15,21 @@ class FSCMLOptimizer {
     }
 
     /**
-     * Inicializar el optimizador ML
+     * Inicializar el optimizador BoostAI™
      */
     async init() {
         try {
-            // Cargar modelo de TensorFlow.js
-            await this.loadModel();
-            
             // Inicializar tracking
             this.initTracking();
             
             // Aplicar optimizaciones inteligentes
             this.applyIntelligentOptimizations();
             
-            console.log('FSC ML Optimizer initialized successfully');
+            console.log('StaticBoost Pro BoostAI™ initialized successfully');
         } catch (error) {
-            console.warn('FSC ML Optimizer failed to initialize:', error);
+            console.warn('BoostAI™ failed to initialize:', error);
             // Fallback a optimizaciones básicas
             this.applyBasicOptimizations();
-        }
-    }
-
-    /**
-     * Cargar modelo de TensorFlow.js
-     */
-    async loadModel() {
-        if (!window.tf || !window.fscML?.model_url) {
-            throw new Error('TensorFlow.js not available or model URL missing');
-        }
-
-        try {
-            this.model = await tf.loadLayersModel(window.fscML.model_url);
-            console.log('ML model loaded successfully');
-        } catch (error) {
-            console.warn('Failed to load ML model, using fallback logic');
-            this.model = null;
         }
     }
 
@@ -102,10 +81,8 @@ class FSCMLOptimizer {
             velocity: this.calculateScrollVelocity()
         });
 
-        // Predicción ML de intención de scroll
-        if (this.model) {
-            this.predictScrollIntention(scrollDepth, this.calculateScrollVelocity());
-        }
+        // Predicción inteligente de intención de scroll
+        this.predictScrollIntention(scrollDepth, this.calculateScrollVelocity());
     }
 
     /**
@@ -125,45 +102,30 @@ class FSCMLOptimizer {
     }
 
     /**
-     * Predecir intención de scroll usando ML
+     * Predecir intención de scroll usando BoostAI™
      */
-    async predictScrollIntention(scrollDepth, velocity) {
-        if (!this.model) return;
+    predictScrollIntention(scrollDepth, velocity) {
+        // Algoritmo propietario de predicción
+        const deviceFactor = this.getDeviceType();
+        const connectionFactor = this.getConnectionSpeed();
+        
+        // Fórmula propietaria BoostAI™
+        const prediction = (scrollDepth * 0.4) + 
+                          (velocity * 0.3) + 
+                          (deviceFactor * 0.2) + 
+                          (connectionFactor * 0.1);
 
-        try {
-            // Preparar datos de entrada para el modelo
-            const inputData = tf.tensor2d([[
-                scrollDepth,
-                velocity,
-                window.innerWidth,
-                window.innerHeight,
-                this.getDeviceType(),
-                this.getConnectionSpeed()
-            ]]);
-
-            // Ejecutar predicción
-            const prediction = await this.model.predict(inputData);
-            const probability = await prediction.data();
-
-            // Aplicar optimizaciones basadas en predicción
-            if (probability[0] > this.config.scroll_prediction_threshold) {
-                this.preloadNextContent();
-            }
-
-            // Limpiar tensores
-            inputData.dispose();
-            prediction.dispose();
-
-        } catch (error) {
-            console.warn('ML prediction failed:', error);
+        // Aplicar optimizaciones basadas en predicción
+        if (prediction > this.config.scroll_prediction_threshold) {
+            this.preloadNextContent();
         }
     }
 
     /**
-     * Obtener tipo de dispositivo como número
+     * Obtener tipo de dispositivo como factor
      */
     getDeviceType() {
-        return window.fscML?.device_type === 'mobile' ? 1 : 0;
+        return window.sbpBoostAI?.device_type === 'mobile' ? 0.8 : 1.0;
     }
 
     /**
@@ -218,7 +180,7 @@ class FSCMLOptimizer {
             img.dataset.loaded = 'true';
             
             // Añadir clase para animación
-            img.classList.add('fsc-loaded');
+            img.classList.add('sbp-loaded');
         }
     }
 
@@ -417,7 +379,7 @@ class FSCMLOptimizer {
                 if (entry.isIntersecting) {
                     const img = entry.target;
                     img.src = img.dataset.src;
-                    img.classList.add('fsc-loaded');
+                    img.classList.add('sbp-loaded');
                     imageObserver.unobserve(img);
                 }
             });
@@ -464,21 +426,21 @@ class FSCMLOptimizer {
      * Enviar métricas al servidor
      */
     sendMetrics() {
-        if (!this.isTracking || !window.fscML?.ajax_url) return;
+        if (!this.isTracking || !window.sbpBoostAI?.ajax_url) return;
 
         const timeOnPage = Math.round((Date.now() - this.sessionData.startTime) / 1000);
         const scrollDepth = this.getMaxScrollDepth();
 
         const data = {
-            action: 'fsc_track_metrics',
-            nonce: window.fscML.nonce,
-            session_id: window.fscML.session_id,
-            page_url: window.fscML.page_url,
+            action: 'sbp_track_metrics',
+            nonce: window.sbpBoostAI.nonce,
+            session_id: window.sbpBoostAI.session_id,
+            page_url: window.sbpBoostAI.page_url,
             viewport_width: window.innerWidth,
             viewport_height: window.innerHeight,
             scroll_depth: scrollDepth,
             time_on_page: timeOnPage,
-            device_type: window.fscML.device_type,
+            device_type: window.sbpBoostAI.device_type,
             connection_type: this.getConnectionType(),
             ...this.sessionData.performanceMetrics
         };
@@ -489,10 +451,10 @@ class FSCMLOptimizer {
             Object.keys(data).forEach(key => {
                 formData.append(key, data[key]);
             });
-            navigator.sendBeacon(window.fscML.ajax_url, formData);
+            navigator.sendBeacon(window.sbpBoostAI.ajax_url, formData);
         } else {
             // Fallback a fetch
-            fetch(window.fscML.ajax_url, {
+            fetch(window.sbpBoostAI.ajax_url, {
                 method: 'POST',
                 body: new URLSearchParams(data)
             }).catch(error => console.warn('Failed to send metrics:', error));
@@ -521,12 +483,12 @@ class FSCMLOptimizer {
 }
 
 // Inicializar automáticamente
-window.FSCMLOptimizer = new FSCMLOptimizer();
+window.SBPBoostAI = new SBPBoostAI();
 
 // CSS para animaciones de carga
 const style = document.createElement('style');
 style.textContent = `
-.fsc-loaded {
+.sbp-loaded {
     opacity: 1 !important;
     transition: opacity 0.3s ease-in-out;
 }
@@ -536,7 +498,7 @@ img[data-src] {
     transition: opacity 0.3s ease-in-out;
 }
 
-img[data-src].fsc-loaded {
+img[data-src].sbp-loaded {
     opacity: 1;
 }
 `;

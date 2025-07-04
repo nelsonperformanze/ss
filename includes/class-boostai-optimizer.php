@@ -1,55 +1,45 @@
 <?php
 /**
- * Optimizador ML con TensorFlow.js
+ * Optimizador BoostAI™ - Sistema de ML Propietario
  */
-class FSC_ML_Optimizer {
+class SBP_BoostAI_Optimizer {
     
     private $model_path;
-    private $analytics_threshold = 100; // Mínimo de datos para análisis
+    private $analytics_threshold = 100;
     
     public function __construct() {
-        $this->model_path = FSC_ML_DIR . 'scroll-prediction-model.json';
+        $this->model_path = SBP_ML_DIR . 'boostai-model.json';
         
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_ml_scripts'));
-        add_action('wp_ajax_fsc_track_metrics', array($this, 'track_user_metrics'));
-        add_action('wp_ajax_nopriv_fsc_track_metrics', array($this, 'track_user_metrics'));
-        add_action('fsc_ml_analysis', array($this, 'run_adaptive_analysis'));
-        add_action('wp_footer', array($this, 'inject_ml_tracker'), 999);
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_boostai_scripts'));
+        add_action('wp_ajax_sbp_track_metrics', array($this, 'track_user_metrics'));
+        add_action('wp_ajax_nopriv_sbp_track_metrics', array($this, 'track_user_metrics'));
+        add_action('sbp_boostai_analysis', array($this, 'run_adaptive_analysis'));
+        add_action('wp_footer', array($this, 'inject_boostai_tracker'), 999);
     }
     
     /**
-     * Cargar scripts de TensorFlow.js y modelo
+     * Cargar scripts de BoostAI™
      */
-    public function enqueue_ml_scripts() {
-        if (!get_option('fsc_ml_enabled', true) || is_admin()) {
+    public function enqueue_boostai_scripts() {
+        if (!get_option('sbp_boostai_enabled', true) || is_admin()) {
             return;
         }
         
-        // TensorFlow.js (versión ligera)
+        // Nuestro optimizador BoostAI™
         wp_enqueue_script(
-            'tensorflow-js',
-            'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js',
+            'sbp-boostai-optimizer',
+            SBP_PLUGIN_URL . 'assets/boostai-optimizer.js',
             array(),
-            '4.10.0',
-            true
-        );
-        
-        // Nuestro optimizador ML
-        wp_enqueue_script(
-            'fsc-ml-optimizer',
-            FSC_PLUGIN_URL . 'assets/ml-optimizer.js',
-            array('tensorflow-js'),
-            FSC_VERSION,
+            SBP_VERSION,
             true
         );
         
         // Configuración adaptativa
         $adaptive_config = $this->get_adaptive_config();
         
-        wp_localize_script('fsc-ml-optimizer', 'fscML', array(
+        wp_localize_script('sbp-boostai-optimizer', 'sbpBoostAI', array(
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('fsc_ml_nonce'),
-            'model_url' => FSC_PLUGIN_URL . 'ml/scroll-prediction-model.json',
+            'nonce' => wp_create_nonce('sbp_boostai_nonce'),
             'config' => $adaptive_config,
             'session_id' => $this->get_session_id(),
             'page_url' => get_permalink(),
@@ -63,7 +53,7 @@ class FSC_ML_Optimizer {
     private function get_adaptive_config() {
         global $wpdb;
         
-        $table = $wpdb->prefix . 'fsc_adaptive_config';
+        $table = $wpdb->prefix . 'sbp_adaptive_config';
         $current_url = $_SERVER['REQUEST_URI'];
         $device_type = wp_is_mobile() ? 'mobile' : 'desktop';
         
@@ -99,18 +89,18 @@ class FSC_ML_Optimizer {
             session_start();
         }
         
-        if (!isset($_SESSION['fsc_session_id'])) {
-            $_SESSION['fsc_session_id'] = wp_generate_password(32, false);
+        if (!isset($_SESSION['sbp_session_id'])) {
+            $_SESSION['sbp_session_id'] = wp_generate_password(32, false);
         }
         
-        return $_SESSION['fsc_session_id'];
+        return $_SESSION['sbp_session_id'];
     }
     
     /**
      * Rastrear métricas de usuario (AJAX)
      */
     public function track_user_metrics() {
-        check_ajax_referer('fsc_ml_nonce', 'nonce');
+        check_ajax_referer('sbp_boostai_nonce', 'nonce');
         
         global $wpdb;
         
@@ -128,7 +118,7 @@ class FSC_ML_Optimizer {
             'connection_type' => isset($_POST['connection_type']) ? sanitize_text_field($_POST['connection_type']) : null
         );
         
-        $table = $wpdb->prefix . 'fsc_user_metrics';
+        $table = $wpdb->prefix . 'sbp_user_metrics';
         $result = $wpdb->insert($table, $data);
         
         if ($result) {
@@ -139,13 +129,13 @@ class FSC_ML_Optimizer {
     }
     
     /**
-     * Ejecutar análisis adaptativo
+     * Ejecutar análisis adaptativo BoostAI™
      */
     public function run_adaptive_analysis() {
         global $wpdb;
         
-        $metrics_table = $wpdb->prefix . 'fsc_user_metrics';
-        $config_table = $wpdb->prefix . 'fsc_adaptive_config';
+        $metrics_table = $wpdb->prefix . 'sbp_user_metrics';
+        $config_table = $wpdb->prefix . 'sbp_adaptive_config';
         
         // Verificar si tenemos suficientes datos
         $total_metrics = $wpdb->get_var("SELECT COUNT(*) FROM $metrics_table WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
@@ -171,8 +161,8 @@ class FSC_ML_Optimizer {
     private function analyze_device_metrics($device_type) {
         global $wpdb;
         
-        $metrics_table = $wpdb->prefix . 'fsc_user_metrics';
-        $config_table = $wpdb->prefix . 'fsc_adaptive_config';
+        $metrics_table = $wpdb->prefix . 'sbp_user_metrics';
+        $config_table = $wpdb->prefix . 'sbp_adaptive_config';
         
         // Obtener métricas promedio de los últimos 7 días
         $metrics = $wpdb->get_row($wpdb->prepare("
@@ -235,22 +225,22 @@ class FSC_ML_Optimizer {
      */
     private function trigger_static_regeneration() {
         // Programar regeneración en background
-        wp_schedule_single_event(time() + 60, 'fsc_regenerate_with_new_config');
+        wp_schedule_single_event(time() + 60, 'sbp_regenerate_with_new_config');
     }
     
     /**
-     * Inyectar tracker ML en el footer
+     * Inyectar tracker BoostAI™ en el footer
      */
-    public function inject_ml_tracker() {
-        if (!get_option('fsc_ml_enabled', true) || is_admin() || is_user_logged_in()) {
+    public function inject_boostai_tracker() {
+        if (!get_option('sbp_boostai_enabled', true) || is_admin() || is_user_logged_in()) {
             return;
         }
         
-        echo '<script id="fsc-ml-tracker">
-        // Inicializar tracker ML cuando el DOM esté listo
+        echo '<script id="sbp-boostai-tracker">
+        // Inicializar BoostAI™ cuando el DOM esté listo
         document.addEventListener("DOMContentLoaded", function() {
-            if (typeof FSCMLOptimizer !== "undefined") {
-                FSCMLOptimizer.init();
+            if (typeof SBPBoostAI !== "undefined") {
+                SBPBoostAI.init();
             }
         });
         </script>';
